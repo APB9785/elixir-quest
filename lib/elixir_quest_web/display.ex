@@ -1,4 +1,4 @@
-defmodule ElixirQuest.Display do
+defmodule ElixirQuestWeb.Display do
   @moduledoc """
   Functions to display the game state.
   """
@@ -12,9 +12,13 @@ defmodule ElixirQuest.Display do
     Integers represent the number of PlayerChars at that coordinate
   """
   def print(%{map: map, objects: objects}) do
-    objects
-    |> Enum.reduce(map, &Map.put(&2, &1.location, &1))
-    |> print(0, 0, [])
+    mobs = Map.values(objects.mobs)
+    players = Map.values(objects.players)
+
+    new_map = Enum.reduce(mobs, map, &Map.put(&2, &1.location, &1))
+    new_map = Enum.reduce(players, new_map, &Map.put(&2, &1.location, &1))
+
+    print(new_map, 0, 0, [])
   end
 
   def print(map, x, y, acc) do

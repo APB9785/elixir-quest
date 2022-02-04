@@ -14,7 +14,7 @@ config :elixir_quest,
 config :elixir_quest, ElixirQuestWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [view: ElixirQuestWeb.ErrorView, accepts: ~w(html json), layout: false],
-  pubsub_server: ElixirQuest.PubSub,
+  pubsub_server: EQPubSub,
   live_view: [signing_salt: "rYQuInSH"]
 
 # Configures the mailer

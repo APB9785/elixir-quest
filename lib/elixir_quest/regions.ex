@@ -7,8 +7,7 @@ defmodule ElixirQuest.Regions do
   alias ElixirQuest.PlayerChars.PlayerChar
 
   @doc """
-  This is called by an object when spawned, and will send the object's pid to
-  the Region.
+  This is called by an object when spawned, and will send the object's pid to the Region.
   """
   def spawn_in(region_name, object) when is_binary(region_name) do
     [{pid, _}] = Registry.lookup(:region_registry, region_name)
@@ -19,6 +18,12 @@ defmodule ElixirQuest.Regions do
     GenServer.cast(pid, {:entry, object})
   end
 
+  @doc """
+  This will read the map file for a region and parse it into a map, where
+  keys are coordinates ({0, 0} at top left), and values are:
+    "#" for boundaries
+    [] for an open space
+  """
   def map(region_name) do
     path = "static/regions/" <> region_name <> ".txt"
 
@@ -47,40 +52,78 @@ defmodule ElixirQuest.Regions do
     parse_txt(rest, x + 1, y, new_acc)
   end
 
+  @doc """
+  Creates a MapSet of map boundaries and impassable environment spaces.
+  """
   def boundaries(region_map) do
     Enum.reduce(region_map, MapSet.new(), fn {coord, content}, acc ->
       if content == "#", do: MapSet.put(acc, coord), else: acc
     end)
   end
 
+  @doc """
+  Temporary spawner until we have a DB from which to load.
+  """
   def spawn_mobs("cave") do
     to_spawn = [
-      %{type: Goblin, level: 2, location: {2, 2}},
-      %{type: Goblin, level: 2, location: {13, 3}},
-      %{type: Goblin, level: 3, location: {2, 8}},
-      %{type: Goblin, level: 3, location: {13, 8}}
+      %{id: 1, type: Goblin, level: 2, location: {2, 2}},
+      %{id: 2, type: Goblin, level: 2, location: {13, 3}},
+      %{id: 3, type: Goblin, level: 3, location: {2, 8}},
+      %{id: 4, type: Goblin, level: 3, location: {13, 8}}
     ]
 
-    Enum.map(to_spawn, fn %{type: type, level: level, location: location} ->
-      mob = type.new(level, location)
-      IO.puts("Region cave: Level #{level} #{mob.name} spawned")
-      mob
+    Enum.reduce(to_spawn, %{}, fn %{id: id, type: type, level: level, location: location}, acc ->
+      mob = type.new(id, level, location)
+      Map.put(acc, id, mob)
     end)
   end
 
-  # Given an updated %PlayerChar{}, replace the existing one
-  def update_objects(%{objects: objects} = region, %PlayerChar{} = player) do
-    objects = Enum.reject(objects, fn object -> object.name == player.name end)
+  @doc """
+  Attempt to move an object.  If the object is blocked, this will fail silently.
+  Either way, this returns the updated region state.
+  """
+  def move_object(region, object, direction) do
+    new_location = adjacent_coord(object.location, direction)
+    mobs = Map.values(region.objects.mobs)
+    players = Map.values(region.objects.players)
 
-    Map.put(region, :objects, [player | objects])
+    cond do
+      MapSet.member?(region.boundaries, new_location) ->
+        # Collision with map boundary
+        region
+
+      Enum.any?(mobs, &(&1.location == new_location)) ->
+        # Collision with a mob
+        region
+
+      Enum.any?(players, &(&1.location == new_location)) ->
+        # Collision with a player
+        region
+
+      :otherwise ->
+        # No collision detected, go ahead with movement
+        updated_object = Map.put(object, :location, new_location)
+        update_objects(region, updated_object)
+    end
   end
 
-  # Sorts the objects into {[player_chars], [mobs]} so the aggro check
-  # is O(mn) instead of O({m + n}^2)
-  def separate_objects(%{objects: objects}) do
-    Enum.reduce(objects, {[], []}, fn
-      %PlayerChar{} = pc, {pcs, mobs} -> {[pc | pcs], mobs}
-      %Mob{} = mob, {pcs, mobs} -> {pcs, [mob | mobs]}
-    end)
+  defp adjacent_coord({x, y}, direction) do
+    case direction do
+      :north -> {x, y - 1}
+      :south -> {x, y + 1}
+      :east -> {x + 1, y}
+      :west -> {x - 1, y}
+    end
+  end
+
+  # Given an updated PC/mob, replace the existing one
+  defp update_objects(region, object) do
+    case object do
+      %PlayerChar{id: id} ->
+        update_in(region.objects.players, &Map.put(&1, id, object))
+
+      %Mob{id: id} ->
+        update_in(region.objects.mobs, &Map.put(&1, id, object))
+    end
   end
 end

@@ -5,8 +5,6 @@ defmodule ElixirQuest.Application do
 
   use Application
 
-  alias ElixirQuest.MobSupervisor
-  alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.RegionSupervisor
 
   @impl true
@@ -17,7 +15,7 @@ defmodule ElixirQuest.Application do
       # Start the Telemetry supervisor
       ElixirQuestWeb.Telemetry,
       # Start the PubSub system
-      {Phoenix.PubSub, name: ElixirQuest.PubSub},
+      {Phoenix.PubSub, name: EQPubSub},
       # Start the Endpoint (http/https)
       ElixirQuestWeb.Endpoint,
       # Start a worker by calling: ElixirQuest.Worker.start_link(arg)

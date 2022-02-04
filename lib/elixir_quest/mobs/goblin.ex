@@ -4,10 +4,11 @@ defmodule ElixirQuest.Mobs.Goblin do
   """
   alias ElixirQuest.Mobs.Mob
 
-  def new(level, location) do
+  def new(id, level, location) do
     hp = max_hp(level)
 
     %Mob{
+      id: id,
       name: "Goblin",
       type: __MODULE__,
       level: level,

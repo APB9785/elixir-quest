@@ -1,11 +1,20 @@
 <div class="h-screen bg-blue-200 pt-4">
   <div class="flex justify-center align-center h-5/6 text-3xl bg-green-300"
        phx-window-keydown="move">
-    <!--
-      <canvas id="game-display" phx-hook="Display" phx-update="ignore">
-        <p>Game would be HERE.</p>
-      </canvas>
-    -->
+    <%= if @player do %>
+      <div class="w-1/4">
+        <p class="mb-4"><%= @player.name %></p>
+        <div class="w-1/2 h-6 bg-gray-600 rounded-md">
+	        <div class="bg-red-500 rounded-md h-6"
+               style={"width: #{hp_percent(@player)}%;"}>
+            <div class="text-sm center">
+              <%= @player.current_hp %> / <%= @player.max_hp %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
     <%= if @cells do %>
       <div class="h-full grid grid-cols-15 gap-0">
         <%= for cell <- @cells do %>

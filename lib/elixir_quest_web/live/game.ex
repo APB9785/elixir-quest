@@ -3,22 +3,23 @@ defmodule ElixirQuestWeb.Game do
   use ElixirQuestWeb, :live_view
 
   alias ElixirQuest.PlayerChars.PlayerChar
+  alias ElixirQuestWeb.Display
+  alias Phoenix.PubSub
 
   def mount(_, _, socket) do
-    [{region_pid, _}] = Registry.lookup(:region_registry, "cave")
-    player = PlayerChar.new("dude")
+    socket =
+      if connected?(socket) do
+        PubSub.subscribe(EQPubSub, "region:cave")
 
-    socket = assign(socket, cells: nil, region: region_pid, player: player)
+        [{region_pid, _}] = Registry.lookup(:region_registry, "cave")
+        player = PlayerChar.new("dude")
 
-    Process.send_after(self(), :tick, 100)
+        assign(socket, region: region_pid, player: player)
+      else
+        assign(socket, region: nil, player: nil)
+      end
 
-    {:ok, socket}
-  end
-
-  def handle_event("move", %{"direction" => direction}, socket) do
-    GenServer.cast(socket.assigns.player, {:move, convert(direction)})
-
-    {:noreply, socket}
+    {:ok, assign(socket, cells: nil)}
   end
 
   def handle_event("move", %{"key" => key}, socket) do
@@ -48,21 +49,15 @@ defmodule ElixirQuestWeb.Game do
     {:reply, socket.assigns.player.location, socket}
   end
 
-  def handle_info(:tick, socket) do
-    {cells, player} = GenServer.call(socket.assigns.region, {:tick, socket.assigns.player.name})
+  def handle_info({:tick, new_region}, %{assigns: %{player: player}} = socket) do
+    fresh_player =
+      new_region.objects.players
+      |> Map.values()
+      |> Enum.find(&(&1.id == player.id))
 
-    Process.send_after(self(), :tick, 50)
+    fresh_cells = Display.print(new_region)
 
-    {:noreply, assign(socket, cells: cells, player: player)}
-  end
-
-  defp convert(direction) do
-    case direction do
-      "up" -> :north
-      "down" -> :south
-      "left" -> :west
-      "right" -> :east
-    end
+    {:noreply, assign(socket, cells: fresh_cells, player: fresh_player)}
   end
 
   defp render_cell(cell) do
@@ -79,5 +74,9 @@ defmodule ElixirQuestWeb.Game do
     ElixirQuestWeb.Endpoint
     |> Routes.static_path(path)
     |> img_tag(class: "object-scale-down min-w-0 min-h-0 h-fit max-w-full max-h-full")
+  end
+
+  defp hp_percent(%PlayerChar{max_hp: max, current_hp: current}) do
+    current / max * 100
   end
 end

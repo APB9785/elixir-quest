@@ -4,10 +4,11 @@ defmodule ElixirQuest.Regions.Region do
   """
   use GenServer
 
-  alias ElixirQuest.Display
   alias ElixirQuest.Mobs
-  alias ElixirQuest.PlayerChars
+  alias ElixirQuest.Mobs.Mob
+  alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Regions
+  alias Phoenix.PubSub
 
   def start_link(name) do
     GenServer.start_link(__MODULE__, name, name: via_tuple(name))
@@ -23,7 +24,8 @@ defmodule ElixirQuest.Regions.Region do
   end
 
   def handle_continue(:load_map, %{name: name} = state) do
-    Process.send_after(self(), :seek_targets, 1000)
+    Process.send_after(self(), :tick, 50)
+    Process.send_after(self(), :mobs_move, 1000)
     Process.send_after(self(), :aggro, 1000)
 
     map = Regions.map(name)
@@ -31,82 +33,45 @@ defmodule ElixirQuest.Regions.Region do
     IO.puts("Region #{name}: Map + boundaries loaded")
 
     mobs = Regions.spawn_mobs(name)
+    objects = %{mobs: mobs, players: %{}}
+    IO.puts("Region #{name}: mobs loaded")
 
-    loaded = Map.merge(state, %{map: map, boundaries: boundaries, objects: mobs})
+    loaded = Map.merge(state, %{map: map, boundaries: boundaries, objects: objects})
 
     {:noreply, loaded}
   end
 
   # Collision detection
   def handle_cast({:move, direction, player}, state) do
-    {:noreply, PlayerChars.move(state, player, direction)}
+    {:noreply, Regions.move_object(state, player, direction)}
   end
 
   # This will handle all new players joining from other regions.
-  def handle_cast({:entry, object}, state) do
-    {:noreply, Map.update!(state, :objects, &[object | &1])}
+  def handle_cast({:entry, %PlayerChar{} = player}, state) do
+    {:noreply, update_in(state.objects.players, &Map.put(&1, player.id, player))}
   end
 
-  # Display
-  def handle_call({:tick, player_name}, _from, state) do
-    display = Display.print(state)
-    player = Enum.find(state.objects, fn object -> object.name == player_name end)
+  # This handles mob spawns
+  def handle_cast({:entry, %Mob{} = mob}, state) do
+    {:noreply, update_in(state.objects.mobs, &Map.put(&1, mob.id, mob))}
+  end
 
-    {:reply, {display, player}, state}
+  # Broadcast the region state to each player
+  def handle_info(:tick, state) do
+    Process.send_after(self(), :tick, 50)
+    PubSub.broadcast(EQPubSub, "region:cave", {:tick, state})
+    {:noreply, state}
   end
 
   # This will move mobs toward their targets
-  def handle_info(:seek_targets, state) do
-    Process.send_after(self(), :seek_targets, 1000)
-    {:noreply, Mobs.seek_targets(state)}
+  def handle_info(:mobs_move, state) do
+    Process.send_after(self(), :mobs_move, 1000)
+    {:noreply, Mobs.move(state)}
   end
 
   # This will aggro mobs to nearby players
   def handle_info(:aggro, state) do
     Process.send_after(self(), :aggro, 1000)
-    {:noreply, Mobs.add_targets(state)}
+    {:noreply, Mobs.aggro(state)}
   end
-
-  # def handle_call({:move_mob, mob, prev_coord, new_coord}, _from, state) do
-  #   case Map.get(state.map, new_coord) do
-  #     [] ->
-  #       new_state =
-  #         Map.update!(state, :map, fn map ->
-  #           map
-  #           |> Map.update!(prev_coord, &remove_object(&1, mob))
-  #           |> Map.put(new_coord, mob)
-  #         end)
-  #
-  #       {:reply, :ok, new_state}
-  #
-  #     _players_or_mob_or_boundary ->
-  #       {:reply, :blocked, state}
-  #   end
-  # end
-  #
-  # defp remove_object(players, player_to_remove) when is_list(players) do
-  #   Enum.reject(players, &(&1.name == player_to_remove.name))
-  # end
-  #
-  # defp remove_object(_mob, _), do: []
-  #
-  # defp add_object(map, %Mob{location: location} = mob) do
-  #   case Map.get(map, location) do
-  #     [] -> Map.put(map, location, mob)
-  #     nil -> raise "SpawnError: out of bounds"
-  #     "#" -> raise "SpawnError: on boundary"
-  #     %Mob{} -> raise "SpawnError: on existing mob"
-  #     _players -> raise "SpawnError: on existing player"
-  #   end
-  # end
-  #
-  # defp add_object(map, %PlayerChar{location: location} = player) do
-  #   case Map.get(map, location) do
-  #     [] -> Map.put(map, location, [player])
-  #     nil -> raise "SpawnError: out of bounds"
-  #     "#" -> raise "SpawnError: on boundary"
-  #     %Mob{} -> raise "SpawnError: on existing mob"
-  #     _players -> Map.update!(map, location, &[player | &1])
-  #   end
-  # end
 end
