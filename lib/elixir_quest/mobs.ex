@@ -2,41 +2,53 @@ defmodule ElixirQuest.Mobs do
   @moduledoc """
   Functions for working with Mobs.
   """
+  import Ecto.Query
+
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.PlayerChars.PlayerChar
-  alias ElixirQuest.Regions
+  alias ElixirQuest.Regions.Region
+  alias ElixirQuest.Repo
+  alias ElixirQuest.Utils
+  alias ETS.KeyValueSet, as: Ets
 
   @doc """
-  Each mob either moves towards its target, or randomly wanders.
+  Loads all mobs.
   """
-  def move(%{objects: %{mobs: mobs}} = region) do
-    mobs
-    |> Map.values()
-    |> Enum.reduce(region, &seek_or_wander/2)
+  def load_from_region(region_name) do
+    from(m in Mob,
+      where: [region: ^region_name],
+      select: [:id, :name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region]
+    )
+    |> Repo.all()
+    |> Enum.map(&prepare_mob/1)
   end
 
-  @directions [:north, :east, :south, :west]
-
-  defp seek_or_wander(%Mob{target: nil} = mob, region) do
-    direction = Enum.random(@directions)
-
-    Regions.move_object(region, mob, direction)
+  defp prepare_mob(mob) do
+    # Mobs always spawn at their spawn_location and have full hp.
+    Map.merge(mob, %{spawn_location: {mob.x_pos, mob.y_pos}, current_hp: mob.max_hp})
   end
 
-  defp seek_or_wander(%Mob{target: target_id, location: mob_location} = mob, region) do
-    player_location =
-      region.objects.players
-      |> Map.fetch!(target_id)
-      |> Map.fetch!(:location)
+  def seek_or_wander(mob_id, %Region{objects: objects, collision_server: collision} = region) do
+    case Ets.get!(objects, mob_id) do
+      %Mob{target: nil, x_pos: x, y_pos: y} ->
+        # Wander
+        direction = Enum.random([:north, :south, :east, :west])
+        destination = Utils.adjacent_coord({x, y}, direction)
+        # TODO: check if destination is blocked; if so try another
+        GenServer.cast(collision, {:move, mob_id, {x, y}, destination})
 
-    direction = solve_direction(mob_location, player_location)
-
-    Regions.move_object(region, mob, direction)
+      %Mob{target: pc_id, x_pos: x, y_pos: y} ->
+        # Seek
+        %PlayerChar{x_pos: pc_x, y_pos: pc_y} = Ets.get!(objects, pc_id)
+        direction = solve_direction({x, y}, {pc_x, pc_y})
+        destination = Utils.adjacent_coord({x, y}, direction)
+        GenServer.cast(collision, {:move, mob_id, {x, y}, destination})
+    end
   end
 
-  defp solve_direction({mob_x, mob_y}, {player_x, player_y}) do
-    dx = mob_x - player_x
-    dy = mob_y - player_y
+  defp solve_direction({mob_x, mob_y}, {pc_x, pc_y}) do
+    dx = mob_x - pc_x
+    dy = mob_y - pc_y
 
     if abs(dx) > abs(dy) do
       if dx > 0, do: :west, else: :east
@@ -67,8 +79,8 @@ defmodule ElixirQuest.Mobs do
     put_in(region.objects.mobs, updated_mobs_map)
   end
 
-  defp check_aggro?(%Mob{} = mob, %PlayerChar{} = player) do
-    distance(mob.location, player.location) <= mob.aggro_range
+  defp check_aggro?(%Mob{} = mob, %PlayerChar{} = pc) do
+    distance({mob.x_pos, mob.y_pos}, {pc.x_pos, pc.y_pos}) <= mob.aggro_range
   end
 
   defp distance({ax, ay}, {bx, by}) do

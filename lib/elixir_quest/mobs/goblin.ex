@@ -4,34 +4,21 @@ defmodule ElixirQuest.Mobs.Goblin do
   """
   alias ElixirQuest.Mobs.Mob
 
-  def new(id, level, location) do
+  def new(level, region, {x_pos, y_pos}) do
     hp = max_hp(level)
 
     %Mob{
-      id: id,
       name: "Goblin",
-      type: __MODULE__,
       level: level,
+      region: region,
       max_hp: hp,
-      current_hp: hp,
-      status: :alive,
-      location: location,
-      wander: 0,
-      target: nil,
+      x_pos: x_pos,
+      y_pos: y_pos,
       aggro_range: 3
     }
   end
 
   defp max_hp(level) do
     level * 8 + 20
-  end
-
-  def wander(%Mob{name: "Goblin", wander: wander}) do
-    case wander do
-      0 -> {:west, 1}
-      1 -> {:west, 2}
-      2 -> {:east, 3}
-      3 -> {:east, 0}
-    end
   end
 end

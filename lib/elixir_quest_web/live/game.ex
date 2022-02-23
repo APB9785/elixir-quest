@@ -2,71 +2,87 @@ defmodule ElixirQuestWeb.Game do
   @moduledoc false
   use ElixirQuestWeb, :live_view
 
+  alias ElixirQuest.Mobs.Mob
+  alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar
-  alias ElixirQuestWeb.Display
+  alias ElixirQuest.RegionManager
+  alias ElixirQuest.Regions.Region
+  alias ElixirQuest.Utils
   alias Phoenix.PubSub
+
+  @tick_rate 25
 
   def mount(_, _, socket) do
     socket =
       if connected?(socket) do
+        # Register for the PubSub to receive server ticks
         PubSub.subscribe(EQPubSub, "region:cave")
 
-        [{region_pid, _}] = Registry.lookup(:region_registry, "cave")
-        player = PlayerChar.new("dude")
+        # Get region info
+        region = RegionManager.join("cave")
 
-        assign(socket, region: region_pid, player: player)
+        # Temporary id lookup until accounts are setup (then id will be read from accounts table)
+        player_id = PlayerChar.name_to_id("dude")
+
+        player = PlayerChars.spawn(player_id, region.objects, region.collision_server)
+
+        # Eventually replace this with more robust ticker?
+        :timer.send_interval(@tick_rate, :tick)
+
+        assign(socket, region: region, player: player)
       else
         assign(socket, region: nil, player: nil)
       end
 
-    {:ok, assign(socket, cells: nil)}
+    {:ok, assign(socket, cells: nil, move_cooldown: false)}
   end
 
-  def handle_event("move", %{"key" => key}, socket) do
-    %{assigns: %{region: region_pid, player: player_char}} = socket
-
-    cond do
-      key == "ArrowLeft" or key == "a" ->
-        GenServer.cast(region_pid, {:move, :west, player_char})
-
-      key == "ArrowRight" or key == "d" ->
-        GenServer.cast(region_pid, {:move, :east, player_char})
-
-      key == "ArrowUp" or key == "w" ->
-        GenServer.cast(region_pid, {:move, :north, player_char})
-
-      key == "ArrowDown" or key == "s" ->
-        GenServer.cast(region_pid, {:move, :south, player_char})
-
-      true ->
-        nil
-    end
-
+  def handle_event("move", _params, %{assigns: %{move_cooldown: true}} = socket) do
     {:noreply, socket}
   end
 
-  def handle_call(:get_location, _from, socket) do
-    {:reply, socket.assigns.player.location, socket}
+  def handle_event("move", %{"key" => key}, socket) do
+    %{assigns: %{region: %Region{collision_server: collision_server}, player: pc}} = socket
+
+    direction =
+      cond do
+        key == "ArrowLeft" or key == "a" -> :west
+        key == "ArrowRight" or key == "d" -> :east
+        key == "ArrowUp" or key == "w" -> :north
+        key == "ArrowDown" or key == "s" -> :south
+        :otherwise -> :error
+      end
+
+    PlayerChars.move(pc, direction, collision_server)
+
+    # The cooldown prevents corrupting the ETS tables with extremely rapid movement input
+    Process.send_after(self(), :move_cooled, @tick_rate)
+
+    {:noreply, assign(socket, move_cooldown: true)}
   end
 
-  def handle_info({:tick, new_region}, %{assigns: %{player: player}} = socket) do
-    fresh_player =
-      new_region.objects.players
-      |> Map.values()
-      |> Enum.find(&(&1.id == player.id))
+  def handle_info(:tick, %{assigns: %{player: player, region: region}} = socket) do
+    fresh_player = ETS.KeyValueSet.get!(region.objects, player.id)
 
-    fresh_cells = Display.print(new_region)
+    fresh_cells =
+      {fresh_player.x_pos, fresh_player.y_pos}
+      |> Utils.calculate_nearby_coords()
+      |> Enum.map(&Utils.get_location_contents(&1, region))
 
     {:noreply, assign(socket, cells: fresh_cells, player: fresh_player)}
+  end
+
+  def handle_info(:move_cooled, socket) do
+    {:noreply, assign(socket, move_cooldown: false)}
   end
 
   defp render_cell(cell) do
     image_filename =
       case cell do
-        " " -> "background.png"
-        "#" -> "rock_mount.png"
-        "+" -> "goblin.png"
-        "@" -> "knight.png"
+        :empty -> "background.png"
+        :rock -> "rock_mount.png"
+        %Mob{name: "Goblin"} -> "goblin.png"
+        %PlayerChar{} -> "knight.png"
       end
 
     path = Path.join("/images", image_filename)

@@ -1,46 +1,48 @@
 defmodule ElixirQuest.PlayerChars.PlayerChar do
   @moduledoc """
-  The %PlayerChar{} struct.
+  The %PlayerChar{} schema.
   """
-  alias ElixirQuest.Regions
+  use Ecto.Schema
+  import Ecto.Query
+  alias ElixirQuest.Repo
 
-  defstruct [
-    :id,
-    :name,
-    :level,
-    :experience,
-    :max_hp,
-    :current_hp,
-    :status,
-    :location,
-    :region_name,
-    :region_pid,
-    :weapon,
-    :target
-  ]
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
 
-  def new(name) do
-    region_name = "cave"
-    [{region_pid, _}] = Registry.lookup(:region_registry, region_name)
+  schema "player_chars" do
+    field :name, :string
+    field :level, :integer
+    field :experience, :integer
+    field :region, :string
+    field :max_hp, :integer
+    field :current_hp, :integer
+    field :x_pos, :integer
+    field :y_pos, :integer
+    field :target, :binary_id, virtual: true
+  end
 
-    player_char = %__MODULE__{
-      id: 1,
+  def new(name, {x, y}) do
+    %__MODULE__{
       name: name,
       level: 1,
       experience: 0,
-      max_hp: 50,
-      current_hp: 50,
-      status: :alive,
-      location: {5, 1},
-      region_name: region_name,
-      region_pid: region_pid,
+      region: "cave",
+      max_hp: 12,
+      current_hp: 12,
+      x_pos: x,
+      y_pos: y,
       target: nil
     }
+  end
 
-    Regions.spawn_in(region_pid, player_char)
+  def load(id), do: Repo.get(__MODULE__, id)
 
-    IO.puts("Player #{name} spawned.")
-
-    player_char
+  # Temporary id lookup until accounts are setup (then id will be read from accounts table)
+  def name_to_id(name) do
+    Repo.one(
+      from pc in __MODULE__,
+        where: pc.name == ^name,
+        select: pc.id
+    )
   end
 end

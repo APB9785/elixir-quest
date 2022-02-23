@@ -17,6 +17,9 @@ config :elixir_quest, ElixirQuestWeb.Endpoint,
   pubsub_server: EQPubSub,
   live_view: [signing_salt: "rYQuInSH"]
 
+# Configures the repo
+config :elixir_quest, ElixirQuest.Repo, migration_primary_key: [type: :binary_id]
+
 # Configures the mailer
 #
 # By default it uses the "Local" adapter which stores the emails

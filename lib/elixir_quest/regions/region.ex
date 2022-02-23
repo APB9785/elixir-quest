@@ -1,77 +1,33 @@
 defmodule ElixirQuest.Regions.Region do
-  @moduledoc """
-  The %Region{} struct and GenServer.
-  """
-  use GenServer
+  @moduledoc false
+  use Ecto.Schema
 
-  alias ElixirQuest.Mobs
-  alias ElixirQuest.Mobs.Mob
-  alias ElixirQuest.PlayerChars.PlayerChar
-  alias ElixirQuest.Regions
-  alias Phoenix.PubSub
+  import Ecto.Query
 
-  def start_link(name) do
-    GenServer.start_link(__MODULE__, name, name: via_tuple(name))
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
+
+  schema "regions" do
+    field :name, :string
+    field :raw_map, :binary
+
+    # These will be ETS sets
+    field :objects, :any, virtual: true
+    field :location_index, :any, virtual: true
+
+    # These will be pids
+    field :manager, :any, virtual: true
+    field :collision_server, :any, virtual: true
   end
 
-  defp via_tuple(name), do: {:via, Registry, {:region_registry, name}}
-
-  def init(name) do
-    IO.puts("Region #{name}: Initialized.")
-    empty_state = %{name: name}
-
-    {:ok, empty_state, {:continue, :load_map}}
+  def new(name, raw_map) do
+    %__MODULE__{
+      name: name,
+      raw_map: raw_map
+    }
   end
 
-  def handle_continue(:load_map, %{name: name} = state) do
-    Process.send_after(self(), :tick, 50)
-    Process.send_after(self(), :mobs_move, 1000)
-    Process.send_after(self(), :aggro, 1000)
-
-    map = Regions.map(name)
-    boundaries = Regions.boundaries(map)
-    IO.puts("Region #{name}: Map + boundaries loaded")
-
-    mobs = Regions.spawn_mobs(name)
-    objects = %{mobs: mobs, players: %{}}
-    IO.puts("Region #{name}: mobs loaded")
-
-    loaded = Map.merge(state, %{map: map, boundaries: boundaries, objects: objects})
-
-    {:noreply, loaded}
-  end
-
-  # Collision detection
-  def handle_cast({:move, direction, player}, state) do
-    {:noreply, Regions.move_object(state, player, direction)}
-  end
-
-  # This will handle all new players joining from other regions.
-  def handle_cast({:entry, %PlayerChar{} = player}, state) do
-    {:noreply, update_in(state.objects.players, &Map.put(&1, player.id, player))}
-  end
-
-  # This handles mob spawns
-  def handle_cast({:entry, %Mob{} = mob}, state) do
-    {:noreply, update_in(state.objects.mobs, &Map.put(&1, mob.id, mob))}
-  end
-
-  # Broadcast the region state to each player
-  def handle_info(:tick, state) do
-    Process.send_after(self(), :tick, 50)
-    PubSub.broadcast(EQPubSub, "region:cave", {:tick, state})
-    {:noreply, state}
-  end
-
-  # This will move mobs toward their targets
-  def handle_info(:mobs_move, state) do
-    Process.send_after(self(), :mobs_move, 1000)
-    {:noreply, Mobs.move(state)}
-  end
-
-  # This will aggro mobs to nearby players
-  def handle_info(:aggro, state) do
-    Process.send_after(self(), :aggro, 1000)
-    {:noreply, Mobs.aggro(state)}
+  def load(name) do
+    ElixirQuest.Repo.one(from __MODULE__, where: [name: ^name])
   end
 end

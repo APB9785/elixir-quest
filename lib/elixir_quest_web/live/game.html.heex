@@ -5,18 +5,17 @@
       <div class="w-1/4">
         <p class="mb-4"><%= @player.name %></p>
         <div class="w-1/2 h-6 bg-gray-600 rounded-md">
-	        <div class="bg-red-500 rounded-md h-6"
-               style={"width: #{hp_percent(@player)}%;"}>
-            <div class="text-sm center">
-              <%= @player.current_hp %> / <%= @player.max_hp %>
+            <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@player)}%;"}>
+              <div class="text-sm center">
+                <%= @player.current_hp %> / <%= @player.max_hp %>
+              </div>
             </div>
-          </div>
         </div>
       </div>
     <% end %>
 
     <%= if @cells do %>
-      <div class="h-full grid grid-cols-15 gap-0">
+      <div class="h-full grid grid-cols-11 gap-0">
         <%= for cell <- @cells do %>
           <%= render_cell(cell) %>
         <% end %>
