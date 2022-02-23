@@ -32,3 +32,9 @@ elixir_quest-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# IntelliJ config
+/.idea/
+
+.DS_Store
+
+.tool-versions
