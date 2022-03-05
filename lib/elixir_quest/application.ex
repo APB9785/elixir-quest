@@ -2,7 +2,9 @@ defmodule ElixirQuest.Application do
   @moduledoc false
   use Application
 
+  alias ElixirQuest.ObjectsManager
   alias ElixirQuest.RegionSupervisor
+  alias ElixirQuest.TableManager
 
   @impl true
   def start(_type, _args) do
@@ -11,7 +13,9 @@ defmodule ElixirQuest.Application do
       ElixirQuestWeb.Telemetry,
       {Phoenix.PubSub, name: EQPubSub},
       {Registry, [keys: :unique, name: :eq_reg]},
-      {RegionSupervisor, name: RegionSupervisor},
+      ObjectsManager,
+      TableManager,
+      {RegionSupervisor, "cave"},
       ElixirQuestWeb.Endpoint
     ]
 

@@ -1,23 +1,16 @@
 defmodule ElixirQuest.Regions.Region do
   @moduledoc false
   use Ecto.Schema
-
   import Ecto.Query
+  alias ElixirQuest.Mobs.Mob
 
-  @primary_key {:id, :binary_id, autogenerate: true}
+  @primary_key {:name, :string, autogenerate: false}
   @foreign_key_type :binary_id
 
   schema "regions" do
-    field :name, :string
     field :raw_map, :binary
 
-    # These will be ETS sets
-    field :objects, :any, virtual: true
-    field :location_index, :any, virtual: true
-
-    # These will be pids
-    field :manager, :any, virtual: true
-    field :collision_server, :any, virtual: true
+    has_many :mobs, Mob
   end
 
   def new(name, raw_map) do
@@ -29,5 +22,9 @@ defmodule ElixirQuest.Regions.Region do
 
   def load(name) do
     ElixirQuest.Repo.one(from __MODULE__, where: [name: ^name])
+  end
+
+  def load_with_mobs(name) do
+    ElixirQuest.Repo.one(from __MODULE__, where: [name: ^name], preload: [:mobs])
   end
 end

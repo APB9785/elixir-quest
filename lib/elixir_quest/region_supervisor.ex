@@ -2,23 +2,25 @@ defmodule ElixirQuest.RegionSupervisor do
   use Supervisor
 
   alias ElixirQuest.Collision
-  alias ElixirQuest.DisplayServer
-  alias ElixirQuest.RegionManager
-  alias ElixirQuest.Seek
+  alias ElixirQuest.Components
 
-  def start_link(opts) do
-    Supervisor.start_link(__MODULE__, :ok, opts)
+  def start_link(region_name) do
+    Supervisor.start_link(__MODULE__, region_name)
   end
 
   @impl true
-  def init(:ok) do
-    children = [
-      Supervisor.child_spec({Collision, "cave"}, id: {Collision, "cave"}),
-      Supervisor.child_spec({RegionManager, "cave"}, id: {RegionManager, "cave"}),
-      Supervisor.child_spec({DisplayServer, "cave"}, id: {DisplayServer, "cave"}),
-      Supervisor.child_spec({Seek, "cave"}, id: {Seek, "cave"})
+  def init(region_name) do
+    load_order = [
+      Collision,
+      Components
     ]
 
+    children = Enum.map(load_order, &spec(&1, region_name))
+
     Supervisor.init(children, strategy: :one_for_one)
+  end
+
+  defp spec(module, region_name) do
+    Supervisor.child_spec({module, region_name}, id: {module, region_name})
   end
 end

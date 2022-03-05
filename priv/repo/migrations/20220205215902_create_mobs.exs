@@ -9,7 +9,7 @@ defmodule ElixirQuest.Repo.Migrations.CreateMobs do
       add :x_pos, :integer
       add :y_pos, :integer
       add :aggro_range, :integer
-      add :region, :string
+      add :region, references("regions", name: "regions_name_fkey", type: :string)
     end
   end
 end

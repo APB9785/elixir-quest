@@ -5,33 +5,39 @@ defmodule ElixirQuestWeb.Game do
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar
-  alias ElixirQuest.RegionManager
-  alias ElixirQuest.Regions.Region
+  # alias ElixirQuest.RegionManager
+  # alias ElixirQuest.Regions.Region
   alias ElixirQuest.Utils
   alias Phoenix.PubSub
 
-  @tick_rate 25
+  @movement_cooldown 25
 
   def mount(_, _, socket) do
     socket =
       if connected?(socket) do
+        region = "cave"
+        pc_name = "dude"
         # Register for the PubSub to receive server ticks
-        PubSub.subscribe(EQPubSub, "region:cave")
+        PubSub.subscribe(EQPubSub, "tick")
 
         # Get region info
-        region = RegionManager.join("cave")
+        objects = Ets.wrap_existing!(:objects)
+        location_index = Ets.wrap_existing!(:location_index)
+        collision_server = Collision.get_pid(region)
 
         # Temporary id lookup until accounts are setup (then id will be read from accounts table)
-        player_id = PlayerChar.name_to_id("dude")
+        player_id = PlayerChar.name_to_id(pc_name)
 
-        player = PlayerChars.spawn(player_id, region.objects, region.collision_server)
+        pc = PlayerChars.spawn(player_id, objects, collision_server)
 
-        # Eventually replace this with more robust ticker?
-        :timer.send_interval(@tick_rate, :tick)
-
-        assign(socket, region: region, player: player)
+        assign(socket,
+          objects: objects,
+          collision: collision_server,
+          player: pc,
+          location_index: location_index
+        )
       else
-        assign(socket, region: nil, player: nil)
+        assign(socket, objects: nil, collision: nil, player: nil, location_index: nil)
       end
 
     {:ok, assign(socket, cells: nil, move_cooldown: false)}
@@ -42,7 +48,7 @@ defmodule ElixirQuestWeb.Game do
   end
 
   def handle_event("move", %{"key" => key}, socket) do
-    %{assigns: %{region: %Region{collision_server: collision_server}, player: pc}} = socket
+    %{assigns: %{collision: collision_server, player: pc}} = socket
 
     direction =
       cond do
@@ -56,18 +62,21 @@ defmodule ElixirQuestWeb.Game do
     PlayerChars.move(pc, direction, collision_server)
 
     # The cooldown prevents corrupting the ETS tables with extremely rapid movement input
-    Process.send_after(self(), :move_cooled, @tick_rate)
+    Process.send_after(self(), :move_cooled, @movement_cooldown)
 
     {:noreply, assign(socket, move_cooldown: true)}
   end
 
-  def handle_info(:tick, %{assigns: %{player: player, region: region}} = socket) do
-    fresh_player = ETS.KeyValueSet.get!(region.objects, player.id)
+  def handle_info({:tick, _tick}, socket) do
+    # TODO: framerate reduction option?
+    %{assigns: %{player: player, objects: objects, location_index: location_index}} = socket
+
+    fresh_player = ETS.KeyValueSet.get!(objects, player.id)
 
     fresh_cells =
       {fresh_player.x_pos, fresh_player.y_pos}
       |> Utils.calculate_nearby_coords()
-      |> Enum.map(&Utils.get_location_contents(&1, region))
+      |> Enum.map(&Utils.get_location_contents(&1, objects, location_index))
 
     {:noreply, assign(socket, cells: fresh_cells, player: fresh_player)}
   end
