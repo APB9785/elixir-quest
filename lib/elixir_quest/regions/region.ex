@@ -1,30 +1,21 @@
 defmodule ElixirQuest.Regions.Region do
   @moduledoc false
   use Ecto.Schema
-  import Ecto.Query
+  import Ecto.Changeset
   alias ElixirQuest.Mobs.Mob
 
-  @primary_key {:name, :string, autogenerate: false}
-  @foreign_key_type :binary_id
+  @primary_key {:id, :binary_id, autogenerate: true}
 
   schema "regions" do
     field :raw_map, :binary
+    field :name, :string
 
     has_many :mobs, Mob
   end
 
-  def new(name, raw_map) do
-    %__MODULE__{
-      name: name,
-      raw_map: raw_map
-    }
-  end
-
-  def load(name) do
-    ElixirQuest.Repo.one(from __MODULE__, where: [name: ^name])
-  end
-
-  def load_with_mobs(name) do
-    ElixirQuest.Repo.one(from __MODULE__, where: [name: ^name], preload: [:mobs])
+  def changeset(region, attrs) do
+    region
+    |> cast(attrs, [:raw_map, :name])
+    |> validate_required([:raw_map, :name])
   end
 end

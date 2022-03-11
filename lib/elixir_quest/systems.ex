@@ -4,6 +4,7 @@ defmodule ElixirQuest.Systems do
   """
   alias ElixirQuest.Collision
   alias ElixirQuest.Mobs.Mob
+  alias ElixirQuest.Objects
   alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Utils
   alias ETS.KeyValueSet, as: Ets
@@ -38,8 +39,9 @@ defmodule ElixirQuest.Systems do
     end)
   end
 
-  @frequency {:aggro, 10}
-  def aggro()
+  # TODO
+  # @frequency {:aggro, 10}
+  # def aggro()
 
   # Keep this at the bottom to ensure all frequencies are accumulated
   def frequencies, do: @frequency

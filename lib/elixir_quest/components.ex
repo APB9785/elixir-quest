@@ -20,29 +20,29 @@ defmodule ElixirQuest.Components do
 
   @system_frequencies Systems.frequencies()
 
-  def start_link(name) do
-    GenServer.start_link(__MODULE__, name, name: via_tuple(name))
+  def start_link(region) do
+    GenServer.start_link(__MODULE__, region, name: via_tuple(region.id))
   end
 
-  defp via_tuple(name), do: {:via, Registry, {:eq_reg, {:components, name}}}
+  defp via_tuple(id), do: {:via, Registry, {:eq_reg, {__MODULE__, id}}}
 
-  def init(name) do
-    Logger.info("Region #{name}: Components initialized")
+  def init(region) do
+    Logger.info("Region #{region.name}: Components initialized")
     PubSub.subscribe(EQPubSub, "tick")
 
-    {:ok, state, {:continue, :setup}}
+    {:ok, region, {:continue, :setup}}
   end
 
-  def handle_continue(:setup, state) do
+  def handle_continue(:setup, region) do
     state = %{
       objects: Ets.wrap_existing!(:objects),
-      collision_server: Collision.get_pid(name),
+      collision_server: Collision.get_pid(region.id),
       mobs_with_target: [],
-      mobs_without_target: Mobs.ids_from_region(name),
+      mobs_without_target: Mobs.ids_from_region(region.id),
       player_chars: []
     }
 
-    Logger.info("Region #{name}: Components set up")
+    Logger.info("Region #{region.name}: Components set up")
 
     {:noreply, state}
   end
@@ -52,7 +52,7 @@ defmodule ElixirQuest.Components do
 
     Enum.each(@system_frequencies, fn {system, frequency} ->
       if rem(tick, frequency) == 0 do
-        Systems.system(state)
+        apply(Systems, system, [state])
       end
     end)
 

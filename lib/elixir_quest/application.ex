@@ -3,8 +3,9 @@ defmodule ElixirQuest.Application do
   use Application
 
   alias ElixirQuest.ObjectsManager
-  alias ElixirQuest.RegionSupervisor
+  alias ElixirQuest.RealmSupervisor
   alias ElixirQuest.TableManager
+  alias ElixirQuest.Ticker
 
   @impl true
   def start(_type, _args) do
@@ -15,7 +16,8 @@ defmodule ElixirQuest.Application do
       {Registry, [keys: :unique, name: :eq_reg]},
       ObjectsManager,
       TableManager,
-      {RegionSupervisor, "cave"},
+      RealmSupervisor,
+      Ticker,
       ElixirQuestWeb.Endpoint
     ]
 

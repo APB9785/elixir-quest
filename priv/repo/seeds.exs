@@ -1,20 +1,10 @@
-# Script for populating the database. You can run it as:
-#
-#     mix run priv/repo/seeds.exs
-#
-# Inside the script, you can read and write to any of your
-# repositories directly:
-#
-#     ElixirQuest.Repo.insert!(%ElixirQuest.SomeSchema{})
-#
-# We recommend using the bang functions (`insert!`, `update!`
-# and so on) as they will fail if something goes wrong.
-alias ElixirQuest.Mobs.Goblin
-alias ElixirQuest.PlayerChars.PlayerChar
-alias ElixirQuest.Regions.Region
-alias ElixirQuest.Repo
+# Script for populating the database. You can run it as: `mix run priv/repo/seeds.exs`
 
-# REGION MAPS
+alias ElixirQuest.Mobs
+alias ElixirQuest.PlayerChars
+alias ElixirQuest.Regions
+
+# REGIONS
 
 regions = ["cave"]
 
@@ -27,31 +17,37 @@ Enum.each(regions, fn region_name ->
     |> Path.join(path)
     |> File.read!()
 
-  region = Region.new(region_name, raw_map)
-  Repo.insert!(region)
+  Regions.new!(region_name, raw_map)
 end)
+
+[cave] = Regions.load_all()
 
 # MOBS
 
 cave_goblins = [
-  {2, "cave", {2, 2}},
-  {2, "cave", {13, 3}},
-  {3, "cave", {2, 8}},
-  {3, "cave", {13, 8}}
+  %{level: 2, x_pos: 2, y_pos: 2},
+  %{level: 2, x_pos: 13, y_pos: 3},
+  %{level: 3, x_pos: 2, y_pos: 8},
+  %{level: 3, x_pos: 13, y_pos: 8}
 ]
 
-Enum.each(cave_goblins, fn {level, region, location} ->
-  mob = Goblin.new(level, region, location)
-  Repo.insert!(mob)
+Enum.each(cave_goblins, fn attrs ->
+  attrs
+  |> Map.merge(%{name: "Goblin", max_hp: 8, aggro_range: 3, region_id: cave.id})
+  |> Mobs.new!()
 end)
 
-# PLAYER CHARACTERS
+# PLAYER CHARACTER
 
-player_chars = [
-  {"dude", {6, 6}}
-]
+pc_attrs = %{
+  name: "dude",
+  region_id: cave.id,
+  level: 1,
+  experience: 0,
+  max_hp: 12,
+  current_hp: 12,
+  x_pos: 6,
+  y_pos: 6
+}
 
-Enum.each(player_chars, fn {name, location} ->
-  pc = PlayerChar.new(name, location)
-  Repo.insert!(pc)
-end)
+PlayerChars.new!(pc_attrs)

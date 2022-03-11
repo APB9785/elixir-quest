@@ -7,12 +7,13 @@ defmodule ElixirQuest.ObjectsManager do
   """
   use GenServer
 
+  alias ElixirQuest.Objects
   alias ETS.KeyValueSet, as: Ets
 
   require Logger
 
   def start_link(_) do
-    GenServer.start_link(__MODULE__, [], name: {:via, Registry, {:eq_reg, :objects_manager}})
+    GenServer.start_link(__MODULE__, [], name: {:via, Registry, {:eq_reg, __MODULE__}})
   end
 
   def init(_) do
@@ -21,7 +22,7 @@ defmodule ElixirQuest.ObjectsManager do
   end
 
   def handle_continue(:receive_ets_transfer, _) do
-    {:ok, objects, _, _} = Ets.accept()
+    {:ok, %{kv_set: objects}} = Ets.accept()
     Logger.info("Objects table giveaway successful")
 
     {:noreply, objects}
@@ -47,7 +48,7 @@ defmodule ElixirQuest.ObjectsManager do
   Gives ownership of a table to the Objects Manager
   """
   def give_table(objects) do
-    [{objects_manager, _}] = Registry.lookup(:eq_reg, :objects_manager)
+    [{objects_manager, _}] = Registry.lookup(:eq_reg, __MODULE__)
     Ets.give_away!(objects, objects_manager)
   end
 end

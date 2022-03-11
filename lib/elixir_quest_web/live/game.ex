@@ -2,12 +2,14 @@ defmodule ElixirQuestWeb.Game do
   @moduledoc false
   use ElixirQuestWeb, :live_view
 
+  alias ElixirQuest.Collision
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar
   # alias ElixirQuest.RegionManager
   # alias ElixirQuest.Regions.Region
   alias ElixirQuest.Utils
+  alias ETS.KeyValueSet, as: Ets
   alias Phoenix.PubSub
 
   @movement_cooldown 25
@@ -15,20 +17,18 @@ defmodule ElixirQuestWeb.Game do
   def mount(_, _, socket) do
     socket =
       if connected?(socket) do
-        region = "cave"
-        pc_name = "dude"
+        # Temporary lookup until accounts are setup (then id will be read from accounts table)
+        pc = PlayerChars.get_by_name("dude")
+
         # Register for the PubSub to receive server ticks
         PubSub.subscribe(EQPubSub, "tick")
 
         # Get region info
         objects = Ets.wrap_existing!(:objects)
         location_index = Ets.wrap_existing!(:location_index)
-        collision_server = Collision.get_pid(region)
+        collision_server = Collision.get_pid(pc.region_id)
 
-        # Temporary id lookup until accounts are setup (then id will be read from accounts table)
-        player_id = PlayerChar.name_to_id(pc_name)
-
-        pc = PlayerChars.spawn(player_id, objects, collision_server)
+        PlayerChars.spawn(pc, objects, collision_server)
 
         assign(socket,
           objects: objects,
@@ -71,7 +71,7 @@ defmodule ElixirQuestWeb.Game do
     # TODO: framerate reduction option?
     %{assigns: %{player: player, objects: objects, location_index: location_index}} = socket
 
-    fresh_player = ETS.KeyValueSet.get!(objects, player.id)
+    fresh_player = Ets.get!(objects, player.id)
 
     fresh_cells =
       {fresh_player.x_pos, fresh_player.y_pos}

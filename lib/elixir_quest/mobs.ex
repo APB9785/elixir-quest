@@ -11,13 +11,19 @@ defmodule ElixirQuest.Mobs do
   alias ElixirQuest.Utils
   alias ETS.KeyValueSet, as: Ets
 
+  def new!(attrs) do
+    %Mob{}
+    |> Mob.changeset(attrs)
+    |> Repo.insert!()
+  end
+
   @doc """
   Loads all mobs.
   """
-  def load_from_region(region_name) do
+  def load_from_region(region_id) do
     from(m in Mob,
-      where: [region: ^region_name],
-      select: [:id, :name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region]
+      where: [region_id: ^region_id],
+      select: [:id, :name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region_id]
     )
     |> Repo.all()
     |> Enum.map(&prepare_mob/1)
@@ -26,11 +32,11 @@ defmodule ElixirQuest.Mobs do
   @doc """
   Get all mob ids from a region.
   """
-  def ids_from_region(region_name) do
+  def ids_from_region(region_id) do
     Repo.all(
       from m in Mob,
-        where: [region: ^region_name],
-        select: :id
+        where: m.region_id == ^region_id,
+        select: m.id
     )
   end
 

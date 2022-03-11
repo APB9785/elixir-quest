@@ -4,23 +4,23 @@ defmodule ElixirQuest.RegionSupervisor do
   alias ElixirQuest.Collision
   alias ElixirQuest.Components
 
-  def start_link(region_name) do
-    Supervisor.start_link(__MODULE__, region_name)
+  def start_link(region) do
+    Supervisor.start_link(__MODULE__, region)
   end
 
   @impl true
-  def init(region_name) do
+  def init(region) do
     load_order = [
       Collision,
       Components
     ]
 
-    children = Enum.map(load_order, &spec(&1, region_name))
+    children = Enum.map(load_order, &spec(&1, region))
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  defp spec(module, region_name) do
-    Supervisor.child_spec({module, region_name}, id: {module, region_name})
+  defp spec(module, region) do
+    Supervisor.child_spec({module, region}, id: {module, region.id})
   end
 end

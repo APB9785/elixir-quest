@@ -3,25 +3,30 @@ defmodule ElixirQuest.Mobs.Mob do
   The %Mob{} schema.
   """
   use Ecto.Schema
-  import Ecto.Query
+  import Ecto.Changeset
   alias ElixirQuest.Regions.Region
-  alias ElixirQuest.Repo
 
   @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :string
+  @foreign_key_type :binary_id
 
   schema "mobs" do
     field :name, :string
     field :level, :integer
     field :max_hp, :integer
-    field :current_hp, :integer
     field :x_pos, :integer
     field :y_pos, :integer
-    field :target, :binary_id
     field :aggro_range, :integer
+    field :target, :binary_id, virtual: true
+    field :current_hp, :integer, virtual: true
 
-    belongs_to :region, Region, references: :name, foreign_key: :region_name
+    belongs_to :region, Region
   end
 
-  def load(id), do: Repo.get(__MODULE__, id)
+  def changeset(mob, attrs) do
+    fields = [:name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region_id]
+
+    mob
+    |> cast(attrs, fields)
+    |> validate_required(fields)
+  end
 end

@@ -4,39 +4,41 @@ defmodule ElixirQuest.Collision do
   """
   use GenServer
 
-  # alias ElixirQuest.Mobs
-  # alias ElixirQuest.Regions
-  alias ElixirQuest.Regions.Region
+  alias ElixirQuest.Mobs
+  alias ElixirQuest.ObjectsManager
+  alias ElixirQuest.TableManager
   alias ElixirQuest.Utils
   alias ETS.KeyValueSet, as: Ets
 
   require Logger
 
-  def start_link(name) do
-    GenServer.start_link(__MODULE__, name, name: via_tuple(name))
+  def start_link(region) do
+    GenServer.start_link(__MODULE__, region, name: via_tuple(region.id))
   end
 
-  defp via_tuple(name), do: {:via, Registry, {:eq_reg, {:collision, name}}}
+  defp via_tuple(id), do: {:via, Registry, {:eq_reg, {__MODULE__, id}}}
 
-  def init(name) do
-    Logger.info("Region #{name}: Collision server initialized")
-    {:ok, name, {:continue, :receive_ets_transfer}}
+  def init(region) do
+    Logger.info("Region #{region.name}: Collision server initialized")
+    {:ok, region, {:continue, :receive_ets_transfer}}
   end
 
-  def handle_continue(:receive_ets_transfer, name) do
-    objects_manager = Utils.lookup_pid(:objects_manager)
+  def handle_continue(:receive_ets_transfer, region) do
+    objects_manager = Utils.lookup_pid(ObjectsManager)
 
     # Request new collison table
     TableManager.spawn_location_index()
 
     # Receive new collision table
-    {:ok, location_index, _, _} = Ets.accept()
+    {:ok, %{kv_set: location_index}} = Ets.accept()
     Logger.info("Location index giveaway successful")
 
-    %Region{raw_map: raw_map, mobs: mobs} = Region.load_with_mobs(name)
+    # Spawn mobs
+    region.id
+    |> Mobs.load_from_region()
+    |> Enum.each(&spawn_object(&1, location_index, objects_manager))
 
-    Enum.each(mobs, &spawn_object(&1, location_index, objects_manager))
-    load_boundaries(raw_map, location_index)
+    load_boundaries(region.raw_map, location_index)
 
     state = %{
       location_index: location_index,
@@ -82,7 +84,7 @@ defmodule ElixirQuest.Collision do
         GenServer.cast(objects_manager, {:spawn, object})
 
       {:error, error} ->
-        Logger.error("#{object.region}: Object #{object.name} failed to spawn (#{error})")
+        Logger.error("#{object.name} failed to spawn (#{error})")
     end
   end
 
@@ -106,8 +108,8 @@ defmodule ElixirQuest.Collision do
 
   # Public functions
 
-  def get_pid(name) do
-    Utils.lookup_pid({:collision, name})
+  def get_pid(region_id) do
+    Utils.lookup_pid({__MODULE__, region_id})
   end
 
   def move(collision_server, object_id, current_location, destination) do
