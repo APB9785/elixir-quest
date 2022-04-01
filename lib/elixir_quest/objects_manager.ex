@@ -7,8 +7,12 @@ defmodule ElixirQuest.ObjectsManager do
   """
   use GenServer
 
+  alias ElixirQuest.Mobs
+  alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.Objects
-  alias ETS.KeyValueSet, as: Ets
+  alias ElixirQuest.Regions
+  alias ElixirQuest.Utils
+  alias ETS.Set, as: Ets
 
   require Logger
 
@@ -22,33 +26,94 @@ defmodule ElixirQuest.ObjectsManager do
   end
 
   def handle_continue(:receive_ets_transfer, _) do
-    {:ok, %{kv_set: objects}} = Ets.accept()
+    {:ok, %{set: objects}} = Ets.accept()
     Logger.info("Objects table giveaway successful")
 
+    {:noreply, objects, {:continue, :load_objects}}
+  end
+
+  def handle_continue(:load_objects, objects) do
+    mobs = Mobs.load_all()
+    regions = Regions.load_all()
+
+    Enum.each(mobs, fn mob ->
+      to_insert = Mob.to_ets(mob)
+      Ets.put!(objects, to_insert)
+    end)
+
+    Enum.each(regions, fn region ->
+      Objects.load_boundaries(objects, region)
+    end)
+
     {:noreply, objects}
   end
 
-  # Updates the objects table with a move (validated beforehand by region's collision server)
-  def handle_cast({:move, object_id, destination}, objects) do
-    Objects.update_position(objects, object_id, destination)
-    {:noreply, objects}
-  end
-
-  # This will handle all new spawns (validated beforehand by region's collision server)
-  def handle_cast({:spawn, object}, objects) do
-    case Objects.spawn(objects, object) do
-      {:ok, _} -> :ok
-      {:error, _} -> Logger.error("#{object.region}: #{object.name} failed to spawn")
+  # Updates the objects table with a move if the destination is not occupied
+  def handle_cast({:move, object, destination}, objects) do
+    case Objects.get_by_location(destination, object.region_id) do
+      :empty -> Objects.update_position(objects, object, destination)
+      _ -> nil
     end
 
     {:noreply, objects}
+  end
+
+  def handle_cast({:assign_target, object_id, target_id}, objects) do
+    Objects.assign_target(objects, object_id, target_id)
+
+    {:noreply, objects}
+  end
+
+  # This will handle all new spawns
+  # TODO: What if the object attempts to spawn at a coordinate which is already occupied?
+  def handle_call({:spawn, object}, _from, objects) do
+    case Objects.get_by_location({object.x_pos, object.y_pos}, object.region_id) do
+      :empty ->
+        Objects.spawn(objects, object)
+        {:reply, {:ok, object}, objects}
+
+      result ->
+        Logger.error("#{object.name} failed to spawn (collision with #{elem(result, 2)})")
+        {:reply, {:error, :collision}, objects}
+    end
+  end
+
+  ## API
+
+  @doc """
+  Attempt to move an object to the given coordinate.  This will fail silently if the
+  coordinate is already occupied.
+  """
+  @spec attempt_move(Mob.t() | PlayerChar.t(), {integer(), integer()}) :: :ok
+  def attempt_move(object, destination) do
+    objects_manager = {:via, Registry, {:eq_reg, __MODULE__}}
+    GenServer.cast(objects_manager, {:move, object, destination})
+  end
+
+  @doc """
+  Attempt to spawn an object to the given coordinate.  Returns `{:ok, object}` if successful
+  and `{:error, :collision}` otherwise.
+  """
+  @spec attempt_spawn(Mob.t() | PlayerChar.t()) :: :ok
+  def attempt_spawn(object) do
+    objects_manager = {:via, Registry, {:eq_reg, __MODULE__}}
+    GenServer.call(objects_manager, {:spawn, object})
+  end
+
+  @doc """
+  Attempt a target by ID to a given object.
+  """
+  @spec assign_target(Mob.t() | PlayerChar.t(), Ecto.UUID.t()) :: :ok
+  def assign_target(object, target_id) do
+    objects_manager = {:via, Registry, {:eq_reg, __MODULE__}}
+    GenServer.cast(objects_manager, {:assign_target, object.id, target_id})
   end
 
   @doc """
   Gives ownership of a table to the Objects Manager
   """
   def give_table(objects) do
-    [{objects_manager, _}] = Registry.lookup(:eq_reg, __MODULE__)
+    objects_manager = Utils.lookup_pid(__MODULE__)
     Ets.give_away!(objects, objects_manager)
   end
 end

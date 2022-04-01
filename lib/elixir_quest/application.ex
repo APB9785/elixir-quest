@@ -2,8 +2,8 @@ defmodule ElixirQuest.Application do
   @moduledoc false
   use Application
 
+  alias ElixirQuest.Components
   alias ElixirQuest.ObjectsManager
-  alias ElixirQuest.RealmSupervisor
   alias ElixirQuest.TableManager
   alias ElixirQuest.Ticker
 
@@ -16,8 +16,8 @@ defmodule ElixirQuest.Application do
       {Registry, [keys: :unique, name: :eq_reg]},
       ObjectsManager,
       TableManager,
-      RealmSupervisor,
       Ticker,
+      Components,
       ElixirQuestWeb.Endpoint
     ]
 

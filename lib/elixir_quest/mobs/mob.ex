@@ -29,4 +29,37 @@ defmodule ElixirQuest.Mobs.Mob do
     |> cast(attrs, fields)
     |> validate_required(fields)
   end
+
+  def to_ets(%__MODULE__{
+        id: id,
+        name: name,
+        level: level,
+        max_hp: max_hp,
+        current_hp: current_hp,
+        x_pos: x_pos,
+        y_pos: y_pos,
+        aggro_range: aggro_range,
+        target: target,
+        region_id: region_id
+      }) do
+    {id, __MODULE__, name, level, aggro_range, max_hp, current_hp, x_pos, y_pos, target,
+     region_id}
+  end
+
+  def from_ets(
+        {id, _, name, level, aggro_range, max_hp, current_hp, x_pos, y_pos, target, region_id}
+      ) do
+    %__MODULE__{
+      id: id,
+      name: name,
+      level: level,
+      max_hp: max_hp,
+      current_hp: current_hp,
+      x_pos: x_pos,
+      y_pos: y_pos,
+      aggro_range: aggro_range,
+      target: target,
+      region_id: region_id
+    }
+  end
 end

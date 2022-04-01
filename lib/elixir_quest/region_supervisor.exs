@@ -21,6 +21,6 @@ defmodule ElixirQuest.RegionSupervisor do
   end
 
   defp spec(module, region) do
-    Supervisor.child_spec({module, region}, id: {module, region.id})
+    Supervisor.child_spec({Components, region}, id: {Components, region.id})
   end
 end

@@ -8,7 +8,7 @@ defmodule ElixirQuest.Collision do
   alias ElixirQuest.ObjectsManager
   alias ElixirQuest.TableManager
   alias ElixirQuest.Utils
-  alias ETS.KeyValueSet, as: Ets
+  alias ETS.Set, as: Ets
 
   require Logger
 
@@ -30,7 +30,7 @@ defmodule ElixirQuest.Collision do
     TableManager.spawn_location_index()
 
     # Receive new collision table
-    {:ok, %{kv_set: location_index}} = Ets.accept()
+    {:ok, %{set: location_index}} = Ets.accept()
     Logger.info("Location index giveaway successful")
 
     # Spawn mobs
@@ -86,24 +86,6 @@ defmodule ElixirQuest.Collision do
       {:error, error} ->
         Logger.error("#{object.name} failed to spawn (#{error})")
     end
-  end
-
-  # This will read the raw_map of a region and add the boundaries to its location_index.
-  # The value will be set to `:rock`.
-  defp load_boundaries(raw_map, location_index) do
-    raw_map
-    |> String.graphemes()
-    |> parse_txt(location_index)
-  end
-
-  defp parse_txt(map, location_index, x \\ 0, y \\ 0)
-  defp parse_txt([], _, _, _), do: :ok
-  defp parse_txt(["\n" | rest], index, _x, y), do: parse_txt(rest, index, 0, y + 1)
-  defp parse_txt([" " | rest], index, x, y), do: parse_txt(rest, index, x + 1, y)
-
-  defp parse_txt(["#" | rest], index, x, y) do
-    Ets.put!(index, {x, y}, :rock)
-    parse_txt(rest, index, x + 1, y)
   end
 
   # Public functions

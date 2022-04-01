@@ -10,41 +10,40 @@ defmodule ElixirQuest.Components do
   """
   use GenServer
 
-  alias ElixirQuest.Collision
-  alias ElixirQuest.Mobs
+  # alias ElixirQuest.Mobs
   alias ElixirQuest.Systems
-  alias ETS.KeyValueSet, as: Ets
+  alias ETS.Set, as: Ets
   alias Phoenix.PubSub
 
   require Logger
 
   @system_frequencies Systems.frequencies()
 
-  def start_link(region) do
-    GenServer.start_link(__MODULE__, region, name: via_tuple(region.id))
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, [], name: {:via, Registry, {:eq_reg, __MODULE__}})
   end
 
-  defp via_tuple(id), do: {:via, Registry, {:eq_reg, {__MODULE__, id}}}
-
-  def init(region) do
-    Logger.info("Region #{region.name}: Components initialized")
+  def init(_) do
+    Logger.info("Components initialized")
     PubSub.subscribe(EQPubSub, "tick")
 
-    {:ok, region, {:continue, :setup}}
-  end
-
-  def handle_continue(:setup, region) do
     state = %{
-      objects: Ets.wrap_existing!(:objects),
-      collision_server: Collision.get_pid(region.id),
-      mobs_with_target: [],
-      mobs_without_target: Mobs.ids_from_region(region.id),
-      player_chars: []
+      attacking: %{}
     }
 
-    Logger.info("Region #{region.name}: Components set up")
+    {:ok, state}
+  end
 
-    {:noreply, state}
+  def handle_cast({:start_attack, attacker_id}, state) do
+    {:noreply, Map.update!(state, :attacking, &Map.put_new(&1, attacker_id, 0))}
+  end
+
+  def handle_cast({:stop_attack, attacker_id}, state) do
+    {:noreply, Map.update!(state, :attacking, &Map.delete(&1, attacker_id))}
+  end
+
+  def handle_cast({:update_attackers, updated_attackers}, state) do
+    {:noreply, Map.put(state, :attacking, updated_attackers)}
   end
 
   def handle_info({:tick, tick}, state) do
@@ -57,5 +56,16 @@ defmodule ElixirQuest.Components do
     end)
 
     {:noreply, state}
+  end
+
+  ## API
+
+  @doc """
+  Update the attackers component after a round of attacks.
+  """
+  @spec update_attackers(map()) :: :ok
+  def update_attackers(updated_attackers) do
+    components = {:via, Registry, {:eq_reg, __MODULE__}}
+    GenServer.cast(components, {:update_attackers, updated_attackers})
   end
 end

@@ -3,6 +3,8 @@ defmodule ElixirQuest.PlayerChars do
   Functions for working with player characters.
   """
   import Ecto.Query
+
+  alias ElixirQuest.ObjectsManager
   alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Repo
   alias ElixirQuest.Utils
@@ -30,7 +32,7 @@ defmodule ElixirQuest.PlayerChars do
   If the PC is already present in the table, returns it from memory without a DB query.
   """
   def spawn(pc, objects, collision_server) do
-    case ETS.KeyValueSet.get!(objects, pc.id) do
+    case ETS.Set.get!(objects, pc.id) do
       nil ->
         GenServer.cast(collision_server, {:spawn, pc})
         Logger.info("Player #{pc.name} spawned")
@@ -42,11 +44,11 @@ defmodule ElixirQuest.PlayerChars do
     end
   end
 
-  def move(_, :error, _), do: :ok
+  def move(_, :error), do: :ok
 
-  def move(%PlayerChar{id: pc_id, x_pos: x, y_pos: y}, direction, collision_server)
-      when direction in ~w(north south east west)a and is_pid(collision_server) do
+  def move(%PlayerChar{x_pos: x, y_pos: y} = pc, direction)
+      when direction in ~w(north south east west)a do
     destination = Utils.adjacent_coord({x, y}, direction)
-    GenServer.cast(collision_server, {:move, pc_id, {x, y}, destination})
+    ObjectsManager.attempt_move(pc, destination)
   end
 end

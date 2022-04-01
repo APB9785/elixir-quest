@@ -10,9 +10,9 @@ defmodule ElixirQuest.TableManager do
   alias ElixirQuest.ObjectsManager
   # alias ElixirQuest.Regions.Region
   alias ElixirQuest.Utils
-  alias ETS.KeyValueSet, as: Ets
+  alias ETS.Set, as: Ets
 
-  require ETS.KeyValueSet
+  require ETS.Set
   require Logger
 
   def start_link(_) do
@@ -23,7 +23,6 @@ defmodule ElixirQuest.TableManager do
     objects =
       Ets.new!(
         name: :objects,
-        read_concurrency: true,
         heir: {self(), {:owner_crashed, :objects_manager}}
       )
 
@@ -35,27 +34,6 @@ defmodule ElixirQuest.TableManager do
     {:ok, []}
   end
 
-  def handle_cast({:spawn_location_index, collision_server}, state) do
-    location_index =
-      Ets.new!(
-        name: :location_index,
-        read_concurrency: true,
-        heir: {self(), :owner_crashed}
-      )
-
-    Logger.info("Location index spawned by Table Manager")
-
-    Ets.give_away!(location_index, collision_server)
-    Logger.info("Location index giveaway initiated")
-
-    {:noreply, state}
-  end
-
-  # Send region info to players when they join
-  def handle_call(:join, _from, region) do
-    {:reply, region, region}
-  end
-
   Ets.accept {:owner_crashed, registry_key}, table, _from, state do
     new_owner = lookup_until_alive(registry_key)
     Ets.give_away!(table, new_owner)
@@ -64,7 +42,7 @@ defmodule ElixirQuest.TableManager do
   end
 
   defp lookup_until_alive(name_tuple) do
-    [{collision_server, _}] = Registry.lookup(:eq_reg, name_tuple)
+    collision_server = Utils.lookup_pid(name_tuple)
 
     if Process.alive?(collision_server) do
       collision_server

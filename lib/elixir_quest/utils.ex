@@ -3,7 +3,7 @@ defmodule ElixirQuest.Utils do
   Helpers.
   """
   # alias ElixirQuest.Regions.Region
-  alias ETS.KeyValueSet, as: Ets
+  alias ETS.Set, as: Ets
 
   require Logger
 
