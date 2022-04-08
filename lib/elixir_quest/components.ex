@@ -10,7 +10,10 @@ defmodule ElixirQuest.Components do
   """
   use GenServer
 
-  # alias ElixirQuest.Mobs
+  alias ElixirQuest.Mobs
+  alias ElixirQuest.Mobs.Mob
+  alias ElixirQuest.PlayerChars.PlayerChar
+  alias ElixirQuest.Regions
   alias ElixirQuest.Systems
   alias ETS.Set, as: Ets
   alias Phoenix.PubSub
@@ -20,7 +23,7 @@ defmodule ElixirQuest.Components do
   @system_frequencies Systems.frequencies()
 
   def start_link(_) do
-    GenServer.start_link(__MODULE__, [], name: {:via, Registry, {:eq_reg, __MODULE__}})
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
   def init(_) do
@@ -28,22 +31,67 @@ defmodule ElixirQuest.Components do
     PubSub.subscribe(EQPubSub, "tick")
 
     state = %{
-      attacking: %{}
+      location: Ets.new!(name: :location),
+      health: Ets.new!(name: :health),
+      cooldown: Ets.new!(name: :cooldown),
+      moving: Ets.new!(name: :moving),
+      target: Ets.new!(name: :target),
+      seeking: Ets.new!(name: :seeking),
+      wandering: Ets.new!(name: :wandering),
+      aggro: Ets.new!(name: :aggro),
+      equipped: Ets.new!(name: :equipped),
+      player_chars: Ets.new!(name: :player_chars),
+      image: Ets.new!(name: :image),
+      name: Ets.new!(name: :name)
     }
 
-    {:ok, state}
+    {:ok, state, {:continue, :load}}
   end
 
-  def handle_cast({:start_attack, attacker_id}, state) do
-    {:noreply, Map.update!(state, :attacking, &Map.put_new(&1, attacker_id, 0))}
+  def handle_continue(:load, state) do
+    mobs = Mobs.load_all()
+    regions = Regions.load_all()
+
+    Enum.each(mobs, fn %Mob{id: id} = mob ->
+      add(:location, id, mob.region_id, {mob.x_pos, mob.y_pos})
+      add(:health, id, mob.max_hp, mob.max_hp)
+      add(:wandering, id)
+      add(:aggro, id, mob.aggro_range)
+      add(:image, id, "goblin.png")
+      add(:name, id, mob.name)
+    end)
+
+    Enum.each(regions, &Regions.load_boundaries/1)
+
+    {:noreply, state}
   end
 
-  def handle_cast({:stop_attack, attacker_id}, state) do
-    {:noreply, Map.update!(state, :attacking, &Map.delete(&1, attacker_id))}
+  def handle_call({:spawn_pc, %PlayerChar{id: id} = pc}, _from, state) do
+    if location_occupied?(pc.region_id, {pc.x_pos, pc.y_pos}) do
+      {:reply, :blocked, state}
+    else
+      add(:location, id, pc.region_id, {pc.x_pos, pc.y_pos})
+      add(:health, id, pc.current_hp, pc.max_hp)
+      add(:player_chars, id)
+      add(:image, id, "knight.png")
+      add(:name, id, pc.name)
+
+      {:reply, :success, state}
+    end
   end
 
-  def handle_cast({:update_attackers, updated_attackers}, state) do
-    {:noreply, Map.put(state, :attacking, updated_attackers)}
+  def handle_cast({:move, entity_id, region_id, destination}, state) do
+    unless location_occupied?(region_id, destination) do
+      update_location(entity_id, destination)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:target, id, target_id}, state) do
+    add(:target, id, target_id)
+
+    {:noreply, state}
   end
 
   def handle_info({:tick, tick}, state) do
@@ -51,21 +99,145 @@ defmodule ElixirQuest.Components do
 
     Enum.each(@system_frequencies, fn {system, frequency} ->
       if rem(tick, frequency) == 0 do
-        apply(Systems, system, [state])
+        apply(Systems, system, [])
       end
     end)
 
     {:noreply, state}
   end
 
-  ## API
+  ## Systems API
 
   @doc """
-  Update the attackers component after a round of attacks.
+  Adds a component to an entity.
   """
-  @spec update_attackers(map()) :: :ok
-  def update_attackers(updated_attackers) do
-    components = {:via, Registry, {:eq_reg, __MODULE__}}
-    GenServer.cast(components, {:update_attackers, updated_attackers})
+  def add(:seeking, id), do: :seeking |> Ets.wrap_existing!() |> Ets.put!({id})
+  def add(:wandering, id), do: :wandering |> Ets.wrap_existing!() |> Ets.put!({id})
+  def add(:player_chars, id), do: :player_chars |> Ets.wrap_existing!() |> Ets.put!({id})
+
+  def add(:moving, id, {vx, vy}), do: :moving |> Ets.wrap_existing!() |> Ets.put!({id, {vx, vy}})
+  def add(:image, id, filename), do: :image |> Ets.wrap_existing!() |> Ets.put!({id, filename})
+  def add(:name, id, name), do: :name |> Ets.wrap_existing!() |> Ets.put!({id, name})
+
+  def add(:target, id, target_id),
+    do: :target |> Ets.wrap_existing!() |> Ets.put!({id, target_id})
+
+  def add(:aggro, id, range), do: :aggro |> Ets.wrap_existing!() |> Ets.put!({id, range})
+
+  def add(:equipped, id, equipment),
+    do: :equipped |> Ets.wrap_existing!() |> Ets.put!({id, equipment})
+
+  def add(:location, id, region, {x, y}),
+    do: :location |> Ets.wrap_existing!() |> Ets.put!({id, region, {x, y}})
+
+  def add(:health, id, hp, max_hp),
+    do: :health |> Ets.wrap_existing!() |> Ets.put!({id, hp, max_hp})
+
+  def add(:cooldown, id, action, count),
+    do: :cooldown |> Ets.wrap_existing!() |> Ets.put!({{id, action}, count})
+
+  @doc """
+  Removes a component from an entity.
+  """
+  def remove(:wandering, mob_id), do: :wandering |> Ets.wrap_existing!() |> Ets.delete(mob_id)
+
+  @doc """
+  Get all components of a specified type.
+  """
+  def get_all(component_type), do: component_type |> Ets.wrap_existing!() |> Ets.to_list!()
+
+  @doc """
+  Gets a component from the given table by entity ID.
+  """
+  def get(table, id) do
+    result =
+      table
+      |> Ets.wrap_existing!()
+      |> Ets.get!(id)
+
+    if is_nil(result) do
+      nil
+    else
+      case Tuple.delete_at(result, 0) do
+        {single} -> single
+        multiple -> multiple
+      end
+    end
+  end
+
+  def search_location(region_id, coord) do
+    table = Ets.wrap_existing!(:location)
+
+    case Ets.match!(table, {:"$1", region_id, coord}, 1) do
+      {[], :end_of_table} -> nil
+      {[[entity_id]], _} -> entity_id
+    end
+  end
+
+  @doc """
+  Check a location to see if it is already occupied.
+  """
+  def location_occupied?(region_id, coord) do
+    case search_location(region_id, coord) do
+      nil -> false
+      _ -> true
+    end
+  end
+
+  @doc """
+  Updates the location of an entity to a given coordinate.  Region is unchanged.
+  """
+  def update_location(entity_id, {_x, _y} = destination) do
+    :location
+    |> Ets.wrap_existing!()
+    |> Ets.update_element!(entity_id, {3, destination})
+  end
+
+  @doc """
+  Updates the location of an entity to a given region and coordinate.
+  """
+  def update_location(entity_id, region_id, {_x, _y} = destination) do
+    :location
+    |> Ets.wrap_existing!()
+    |> Ets.update_element!(entity_id, [{2, region_id}, {3, destination}])
+  end
+
+  @doc """
+  Decrements the given entity's current hp.
+  """
+  def decrease_current_hp(entity_id, amount) do
+    {current_hp, _max_hp} = get(:health, entity_id)
+
+    :health
+    |> Ets.wrap_existing!()
+    |> Ets.update_element!(entity_id, {2, current_hp - amount})
+  end
+
+  @doc """
+  Resets a given cooldown after the action is taken.
+  """
+  def reset_cooldown({{entity_id, action}, time}, cooldown) do
+    next_time = NaiveDateTime.add(time, cooldown, :millisecond)
+
+    :cooldown
+    |> Ets.wrap_existing!()
+    |> Ets.update_element!({entity_id, action}, {2, next_time})
+  end
+
+  ## Client API
+
+  @doc """
+  Spawns a Player Character.
+  """
+  def spawn_pc(%PlayerChar{} = pc) do
+    GenServer.call(__MODULE__, {:spawn_pc, pc})
+  end
+
+  def attempt_move(entity_id, region_id, {_x, _y} = destination) do
+    GenServer.cast(__MODULE__, {:move, entity_id, region_id, destination})
+  end
+
+  def add_target(id, target_id) do
+    GenServer.cast(__MODULE__, {:target, id, target_id})
   end
 end

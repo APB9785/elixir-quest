@@ -17,11 +17,11 @@ defmodule ElixirQuest.Mobs do
   Loads all mobs.
   """
   def load_all do
-    from(m in Mob,
-      select: [:id, :name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region_id]
+    Repo.all(
+      from(m in Mob,
+        select: [:id, :name, :level, :max_hp, :x_pos, :y_pos, :aggro_range, :region_id]
+      )
     )
-    |> Repo.all()
-    |> Enum.map(&prepare_mob/1)
   end
 
   @doc """
@@ -34,21 +34,4 @@ defmodule ElixirQuest.Mobs do
         select: m.id
     )
   end
-
-  defp prepare_mob(mob) do
-    # Mobs always spawn at their spawn_location and have full hp.
-    Map.merge(mob, %{spawn_location: {mob.x_pos, mob.y_pos}, current_hp: mob.max_hp})
-  end
-
-  # @doc """
-  # Checks coordinates around a mob, starting with the adjacents, moving further away until
-  # the aggro range is reached.
-  # """
-  # def aggro(_) do
-  #   nil
-  # end
-
-  # defp check_aggro?(%Mob{} = mob, %PlayerChar{} = pc) do
-  #   Utils.distance({mob.x_pos, mob.y_pos}, {pc.x_pos, pc.y_pos}) <= mob.aggro_range
-  # end
 end

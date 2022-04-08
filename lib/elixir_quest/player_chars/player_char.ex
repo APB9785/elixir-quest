@@ -29,36 +29,4 @@ defmodule ElixirQuest.PlayerChars.PlayerChar do
     |> cast(attrs, fields)
     |> validate_required(fields)
   end
-
-  def to_ets(%__MODULE__{
-        id: id,
-        name: name,
-        level: level,
-        experience: experience,
-        max_hp: max_hp,
-        current_hp: current_hp,
-        x_pos: x_pos,
-        y_pos: y_pos,
-        target: target,
-        region_id: region_id
-      }) do
-    {id, __MODULE__, name, level, experience, max_hp, current_hp, x_pos, y_pos, target, region_id}
-  end
-
-  def from_ets(
-        {id, _, name, level, experience, max_hp, current_hp, x_pos, y_pos, target, region_id}
-      ) do
-    %__MODULE__{
-      id: id,
-      name: name,
-      level: level,
-      experience: experience,
-      max_hp: max_hp,
-      current_hp: current_hp,
-      x_pos: x_pos,
-      y_pos: y_pos,
-      target: target,
-      region_id: region_id
-    }
-  end
 end

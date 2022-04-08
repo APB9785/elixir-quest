@@ -2,9 +2,7 @@ defmodule ElixirQuestWeb.Game do
   @moduledoc false
   use ElixirQuestWeb, :live_view
 
-  alias ElixirQuest.Mobs.Mob
-  alias ElixirQuest.Objects
-  alias ElixirQuest.ObjectsManager
+  alias ElixirQuest.Components
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Utils
@@ -18,17 +16,16 @@ defmodule ElixirQuestWeb.Game do
     socket =
       if connected?(socket) do
         # Temporary lookup until accounts are setup (then id will be read from accounts table)
-        pc =
-          "dude"
-          |> PlayerChars.get_by_name()
-          |> spawn_pc()
+        %PlayerChar{id: id, name: name} = pc = PlayerChars.get_by_name("dude")
+
+        spawn_pc(pc)
 
         # Register for the PubSub to receive server ticks
         PubSub.subscribe(EQPubSub, "tick")
 
-        assign(socket, player: pc)
+        assign(socket, pc_id: id, pc_name: name, current_hp: pc.current_hp, max_hp: pc.max_hp)
       else
-        assign(socket, player: nil)
+        assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil)
       end
 
     {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil)}
@@ -38,7 +35,7 @@ defmodule ElixirQuestWeb.Game do
     {:noreply, socket}
   end
 
-  def handle_event("move", %{"key" => key}, %{assigns: %{player: pc}} = socket) do
+  def handle_event("move", %{"key" => key}, %{assigns: %{pc_id: pc_id}} = socket) do
     direction =
       cond do
         key == "ArrowLeft" or key == "a" -> :west
@@ -48,7 +45,12 @@ defmodule ElixirQuestWeb.Game do
         :otherwise -> :error
       end
 
-    PlayerChars.move(pc, direction)
+    unless direction == :error do
+      {region_id, {x, y}} = Components.get(:location, pc_id)
+      destination = Utils.adjacent_coord({x, y}, direction)
+
+      Components.attempt_move(pc_id, region_id, destination)
+    end
 
     # The cooldown prevents corrupting the ETS tables with extremely rapid movement input
     Process.send_after(self(), :move_cooled, @movement_cooldown)
@@ -57,26 +59,44 @@ defmodule ElixirQuestWeb.Game do
   end
 
   def handle_event("target", %{"id" => id}, socket) do
-    ObjectsManager.assign_target(socket.assigns.player, id)
+    Components.add_target(socket.assigns.pc_id, id)
     {:noreply, socket}
   end
 
-  def handle_info({:tick, _tick}, %{assigns: %{player: player}} = socket) do
+  def handle_info({:tick, _tick}, %{assigns: %{pc_id: pc_id}} = socket) do
     # TODO: framerate reduction option?
-    fresh_player = Objects.get_by_id(player.id)
+    {current_hp, max_hp} = Components.get(:health, pc_id)
+    {region_id, {x, y}} = Components.get(:location, pc_id)
 
     target =
-      case fresh_player.target do
-        nil -> nil
-        id -> Objects.get_by_id(id)
+      case Components.get(:target, pc_id) do
+        nil ->
+          # PC has no target
+          nil
+
+        target_id ->
+          case Components.get(:health, target_id) do
+            nil ->
+              # No health means this is probably region boundary entity
+              nil
+
+            {current, max} ->
+              # Valid target
+              %{
+                current_hp: current,
+                max_hp: max,
+                name: Components.get(:name, target_id)
+              }
+          end
       end
 
     fresh_cells =
-      {fresh_player.x_pos, fresh_player.y_pos}
+      {x, y}
       |> Utils.calculate_nearby_coords()
-      |> Enum.map(&Objects.get_by_location(&1, fresh_player.region_id))
+      |> Enum.map(&Components.search_location(region_id, &1))
 
-    {:noreply, assign(socket, cells: fresh_cells, player: fresh_player, target: target)}
+    {:noreply,
+     assign(socket, cells: fresh_cells, current_hp: current_hp, max_hp: max_hp, target: target)}
   end
 
   def handle_info(:move_cooled, socket) do
@@ -84,32 +104,25 @@ defmodule ElixirQuestWeb.Game do
   end
 
   defp spawn_pc(%PlayerChar{id: id} = pc) do
-    case Objects.get_by_id(id) do
-      nil -> attempt_spawn_until_successful(pc)
-      %PlayerChar{} = existing -> existing
-    end
-  end
-
-  defp attempt_spawn_until_successful(pc) do
-    case ObjectsManager.attempt_spawn(pc) do
-      {:error, :collision} ->
+    case Components.spawn_pc(pc) do
+      :blocked ->
         Process.sleep(1000)
-        attempt_spawn_until_successful(pc)
+        spawn_pc(pc)
 
-      {:ok, %PlayerChar{} = spawned} ->
-        spawned
+      :success ->
+        id
     end
   end
 
-  defp render_cell(contents) do
-    {image_filename, id} =
-      case contents do
-        :empty -> {"background.png", nil}
-        %{name: "rock"} -> {"rock_mount.png", nil}
-        %Mob{id: id, name: "Goblin"} -> {"goblin.png", id}
-        %PlayerChar{id: id} -> {"knight.png", id}
-      end
+  defp render_cell(nil), do: render_cell("background.png", nil)
 
+  defp render_cell(content_id) do
+    :image
+    |> Components.get(content_id)
+    |> render_cell(content_id)
+  end
+
+  defp render_cell(image_filename, id) do
     path = Path.join("/images", image_filename)
 
     ElixirQuestWeb.Endpoint
@@ -120,7 +133,7 @@ defmodule ElixirQuestWeb.Game do
     )
   end
 
-  defp hp_percent(%PlayerChar{max_hp: max, current_hp: current}) do
+  defp hp_percent(current, max) do
     current / max * 100
   end
 end

@@ -3,8 +3,6 @@ defmodule ElixirQuest.Application do
   use Application
 
   alias ElixirQuest.Components
-  alias ElixirQuest.ObjectsManager
-  alias ElixirQuest.TableManager
   alias ElixirQuest.Ticker
 
   @impl true
@@ -13,11 +11,8 @@ defmodule ElixirQuest.Application do
       ElixirQuest.Repo,
       ElixirQuestWeb.Telemetry,
       {Phoenix.PubSub, name: EQPubSub},
-      {Registry, [keys: :unique, name: :eq_reg]},
-      ObjectsManager,
-      TableManager,
-      Ticker,
       Components,
+      Ticker,
       ElixirQuestWeb.Endpoint
     ]
 

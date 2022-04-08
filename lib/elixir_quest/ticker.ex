@@ -3,15 +3,17 @@ defmodule ElixirQuest.Ticker do
   A server for broadcasting PubSub ticks.
   """
   use GenServer
+
   alias ElixirQuest.Systems
   alias ElixirQuest.Utils
   alias Phoenix.PubSub
+
   require Logger
 
   @base_tick_rate 25
 
   def start_link(_) do
-    GenServer.start_link(__MODULE__, [], name: {:via, Registry, {:eq_reg, :ticker}})
+    GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
 
   def init(name) do

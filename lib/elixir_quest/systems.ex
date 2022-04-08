@@ -3,34 +3,38 @@ defmodule ElixirQuest.Systems do
   In this module is the logic and frequency for each game system.
   """
   alias ElixirQuest.Components
-  alias ElixirQuest.Mobs.Mob
-  alias ElixirQuest.Objects
-  alias ElixirQuest.ObjectsManager
-  alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Utils
-  alias ETS.Set, as: Ets
 
   Module.register_attribute(__MODULE__, :frequency, accumulate: true)
 
   @frequency {:seek, 40}
-  def seek(_) do
-    mobs = Objects.get_all_mobs_with_target()
+  def seek do
+    seeking = Components.get_all(:seeking)
 
-    Enum.each(mobs, fn %Mob{target: target_id, x_pos: x, y_pos: y} = mob ->
-      %PlayerChar{x_pos: target_x, y_pos: target_y} = Objects.get_by_id(target_id)
+    Enum.each(seeking, fn {mob_id} ->
+      {region_id, {x, y}} = Components.get(:location, mob_id)
+      target_id = Components.get(:target, mob_id)
+      {^region_id, {target_x, target_y}} = Components.get(:location, target_id)
+
+      # TODO: handle if target is no longer in the same region as the seeker
 
       direction = Utils.solve_direction({x, y}, {target_x, target_y})
       destination = Utils.adjacent_coord({x, y}, direction)
 
-      ObjectsManager.attempt_move(mob, destination)
+      unless Components.location_occupied?(region_id, destination) do
+        Components.update_location(mob_id, destination)
+      end
+
+      # TODO: Look for alternate path if blocked?
     end)
   end
 
   @frequency {:wander, 50}
-  def wander(_) do
-    mobs = Objects.get_all_mobs_without_target()
+  def wander do
+    wandering = Components.get_all(:wandering)
 
-    Enum.each(mobs, fn %Mob{x_pos: x, y_pos: y} = mob ->
+    Enum.each(wandering, fn {mob_id} ->
+      {region_id, {x, y}} = Components.get(:location, mob_id)
       direction = Enum.random([:north, :south, :east, :west])
       destination = Utils.adjacent_coord({x, y}, direction)
 
@@ -38,58 +42,72 @@ defmodule ElixirQuest.Systems do
       # However, it could be desirable to not implement this, if we want
       # mobs to spend more time near the walls.
 
-      ObjectsManager.attempt_move(mob, destination)
-    end)
-  end
-
-  @frequency {:debug, 500}
-  def debug(_) do
-    list =
-      :objects
-      |> Ets.wrap_existing!()
-      |> Ets.to_list!()
-
-    Enum.each(list, fn
-      {_, :rock, _, _, _, _, _, _, _, _, _} -> :ok
-      i -> IO.inspect(i)
-    end)
-
-    IO.inspect("-----------")
-  end
-
-  @frequency {:aggro, 50}
-  def aggro(_) do
-    mobs = Objects.get_all_mobs_without_target()
-
-    pcs_by_region =
-      Objects.get_all_pcs()
-      |> Enum.group_by(& &1.region_id)
-
-    Enum.each(mobs, fn %Mob{x_pos: x, y_pos: y, aggro_range: aggro, region_id: region_id} = mob ->
-      local_pcs = Map.get(pcs_by_region, region_id, [])
-
-      case Enum.find(local_pcs, fn pc -> Utils.distance({x, y}, {pc.x_pos, pc.y_pos}) <= aggro end) do
-        %PlayerChar{id: target_id} -> ObjectsManager.assign_target(mob, target_id)
-        nil -> :ok
+      unless Components.location_occupied?(region_id, destination) do
+        Components.update_location(mob_id, destination)
       end
     end)
   end
 
-  @frequency {:attack, 20}
-  def attack(%{attacking: attacker_map}) do
-    new_attacker_map =
-      Enum.reduce(attacker_map, %{}, fn
-        {attacker_id, 0}, acc ->
-          case Objects.do_attack(attacker_id) do
-            {:ok, new_cooldown} -> Map.put(acc, attacker_id, new_cooldown)
-            {:error, _} -> Map.put(acc, attacker_id, 0)
-          end
+  @frequency {:aggro, 50}
+  def aggro do
+    mobs = Components.get_all(:aggro)
 
-        {attacker_id, cooldown}, acc ->
-          Map.put(acc, attacker_id, cooldown - 1)
+    pcs_with_coords_by_region =
+      :player_chars
+      |> Components.get_all()
+      |> Enum.reduce(%{}, fn {pc_id}, acc ->
+        {region, location} = Components.get(:location, pc_id)
+        Map.update(acc, region, [{pc_id, location}], &[{pc_id, location} | &1])
       end)
 
-    Components.update_attackers(new_attacker_map)
+    Enum.each(mobs, fn {mob_id, aggro_range} ->
+      case Components.get(:target, mob_id) do
+        nil ->
+          {mob_region, mob_location} = Components.get(:location, mob_id)
+
+          case Map.get(pcs_with_coords_by_region, mob_region) do
+            nil ->
+              # No PCs in this region
+              :noop
+
+            local_pcs ->
+              case Enum.find(local_pcs, &within_aggro_range?(&1, mob_location, aggro_range)) do
+                nil ->
+                  # All PCs are out of range
+                  :noop
+
+                {pc_id, _} ->
+                  Components.add(:target, mob_id, pc_id)
+                  Components.remove(:wandering, mob_id)
+                  Components.add(:seeking, mob_id)
+              end
+          end
+
+        _ ->
+          # Mob already has a target
+          :noop
+      end
+    end)
+  end
+
+  defp within_aggro_range?({_pc_id, pc_location}, mob_location, aggro_range) do
+    Utils.distance(mob_location, pc_location) <= aggro_range
+  end
+
+  @frequency {:actions, 10}
+  def actions do
+    cooldowns = Components.get_all(:cooldown)
+    now = NaiveDateTime.utc_now()
+
+    Enum.each(cooldowns, fn {{id, :attack}, time} = cooldown ->
+      if NaiveDateTime.compare(now, time) == :gt do
+        %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Components.get(:equipped, id)
+        target_id = Components.get(:target, id)
+
+        Components.decrease_current_hp(target_id, weapon_dmg)
+        Components.reset_cooldown(cooldown, weapon_cd)
+      end
+    end)
   end
 
   # Keep this at the bottom to ensure all frequencies are accumulated
