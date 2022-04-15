@@ -94,7 +94,7 @@ defmodule ElixirQuest.Systems do
     Utils.distance(mob_location, pc_location) <= aggro_range
   end
 
-  @frequency {:actions, 10}
+  @frequency {:actions, 5}
   def actions do
     cooldowns = Components.get_all(:cooldown)
     now = NaiveDateTime.utc_now()
@@ -102,11 +102,33 @@ defmodule ElixirQuest.Systems do
     Enum.each(cooldowns, fn {{id, :attack}, time} = cooldown ->
       if NaiveDateTime.compare(now, time) == :gt do
         %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Components.get(:equipped, id)
-        target_id = Components.get(:target, id)
 
-        Components.decrease_current_hp(target_id, weapon_dmg)
-        Components.reset_cooldown(cooldown, weapon_cd)
+        case Components.get(:target, id) do
+          nil ->
+            Components.reset_cooldown(cooldown)
+
+          target_id ->
+            Components.decrease_current_hp(target_id, weapon_dmg)
+            Components.reset_cooldown(cooldown, weapon_cd)
+        end
       end
+    end)
+  end
+
+  @frequency {:death, 10}
+  def death do
+    dead = Components.get_all(:dead)
+
+    Enum.each(dead, fn {id} ->
+      Components.remove(:location, id)
+      Components.remove(:seeking, id)
+      Components.remove(:wandering, id)
+      Components.remove(:health, id)
+      Components.remove(:aggro, id)
+      Components.remove(:image, id)
+      Components.remove(:name, id)
+      Components.remove(:dead, id)
+      Components.remove_target_from_all(id)
     end)
   end
 

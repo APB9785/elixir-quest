@@ -63,6 +63,11 @@ defmodule ElixirQuestWeb.Game do
     {:noreply, socket}
   end
 
+  def handle_event("attack", _, socket) do
+    Components.add_cooldown(socket.assigns.pc_id, :attack)
+    {:noreply, socket}
+  end
+
   def handle_info({:tick, _tick}, %{assigns: %{pc_id: pc_id}} = socket) do
     # TODO: framerate reduction option?
     {current_hp, max_hp} = Components.get(:health, pc_id)
@@ -110,6 +115,9 @@ defmodule ElixirQuestWeb.Game do
         spawn_pc(pc)
 
       :success ->
+        id
+
+      :already_spawned ->
         id
     end
   end

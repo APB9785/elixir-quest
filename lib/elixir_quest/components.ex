@@ -42,7 +42,8 @@ defmodule ElixirQuest.Components do
       equipped: Ets.new!(name: :equipped),
       player_chars: Ets.new!(name: :player_chars),
       image: Ets.new!(name: :image),
-      name: Ets.new!(name: :name)
+      name: Ets.new!(name: :name),
+      dead: Ets.new!(name: :dead)
     }
 
     {:ok, state, {:continue, :load}}
@@ -67,16 +68,22 @@ defmodule ElixirQuest.Components do
   end
 
   def handle_call({:spawn_pc, %PlayerChar{id: id} = pc}, _from, state) do
-    if location_occupied?(pc.region_id, {pc.x_pos, pc.y_pos}) do
-      {:reply, :blocked, state}
-    else
-      add(:location, id, pc.region_id, {pc.x_pos, pc.y_pos})
-      add(:health, id, pc.current_hp, pc.max_hp)
-      add(:player_chars, id)
-      add(:image, id, "knight.png")
-      add(:name, id, pc.name)
+    cond do
+      get(:player_chars, id) ->
+        {:reply, :already_spawned, state}
 
-      {:reply, :success, state}
+      location_occupied?(pc.region_id, {pc.x_pos, pc.y_pos}) ->
+        {:reply, :blocked, state}
+
+      :otherwise ->
+        add(:location, id, pc.region_id, {pc.x_pos, pc.y_pos})
+        add(:health, id, pc.current_hp, pc.max_hp)
+        add(:player_chars, id)
+        add(:image, id, "knight.png")
+        add(:name, id, pc.name)
+        add(:equipped, id, %{weapon: %{name: "hands", damage: 1, cooldown: 1000}})
+
+        {:reply, :success, state}
     end
   end
 
@@ -90,6 +97,26 @@ defmodule ElixirQuest.Components do
 
   def handle_cast({:target, id, target_id}, state) do
     add(:target, id, target_id)
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:cooldown, id, action}, state) do
+    case get(:cooldown, {id, action}) do
+      nil ->
+        add(:cooldown, id, action, NaiveDateTime.utc_now())
+
+      _ ->
+        :noop
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:remove_target_from_all, target_id}, state) do
+    :target
+    |> Ets.wrap_existing!()
+    |> Ets.match_delete({:_, target_id})
 
     {:noreply, state}
   end
@@ -114,6 +141,7 @@ defmodule ElixirQuest.Components do
   def add(:seeking, id), do: :seeking |> Ets.wrap_existing!() |> Ets.put!({id})
   def add(:wandering, id), do: :wandering |> Ets.wrap_existing!() |> Ets.put!({id})
   def add(:player_chars, id), do: :player_chars |> Ets.wrap_existing!() |> Ets.put!({id})
+  def add(:dead, id), do: :dead |> Ets.wrap_existing!() |> Ets.put!({id})
 
   def add(:moving, id, {vx, vy}), do: :moving |> Ets.wrap_existing!() |> Ets.put!({id, {vx, vy}})
   def add(:image, id, filename), do: :image |> Ets.wrap_existing!() |> Ets.put!({id, filename})
@@ -133,13 +161,13 @@ defmodule ElixirQuest.Components do
   def add(:health, id, hp, max_hp),
     do: :health |> Ets.wrap_existing!() |> Ets.put!({id, hp, max_hp})
 
-  def add(:cooldown, id, action, count),
-    do: :cooldown |> Ets.wrap_existing!() |> Ets.put!({{id, action}, count})
+  def add(:cooldown, id, action, time),
+    do: :cooldown |> Ets.wrap_existing!() |> Ets.put!({{id, action}, time})
 
   @doc """
   Removes a component from an entity.
   """
-  def remove(:wandering, mob_id), do: :wandering |> Ets.wrap_existing!() |> Ets.delete(mob_id)
+  def remove(component, entity_id), do: component |> Ets.wrap_existing!() |> Ets.delete(entity_id)
 
   @doc """
   Get all components of a specified type.
@@ -207,18 +235,32 @@ defmodule ElixirQuest.Components do
   """
   def decrease_current_hp(entity_id, amount) do
     {current_hp, _max_hp} = get(:health, entity_id)
+    health_table = Ets.wrap_existing!(:health)
 
-    :health
-    |> Ets.wrap_existing!()
-    |> Ets.update_element!(entity_id, {2, current_hp - amount})
+    case current_hp - amount do
+      new_hp when new_hp <= 0 ->
+        add(:dead, entity_id)
+        Ets.update_element!(health_table, entity_id, {2, 0})
+
+      new_hp ->
+        Ets.update_element!(health_table, entity_id, {2, new_hp})
+    end
   end
 
   @doc """
-  Resets a given cooldown after the action is taken.
+  Resets a given cooldown after the action is taken, or when an action fails.
   """
+  def reset_cooldown({{entity_id, action}, _time}) do
+    next_time = NaiveDateTime.utc_now()
+    do_reset_cooldown(entity_id, action, next_time)
+  end
+
   def reset_cooldown({{entity_id, action}, time}, cooldown) do
     next_time = NaiveDateTime.add(time, cooldown, :millisecond)
+    do_reset_cooldown(entity_id, action, next_time)
+  end
 
+  defp do_reset_cooldown(entity_id, action, next_time) do
     :cooldown
     |> Ets.wrap_existing!()
     |> Ets.update_element!({entity_id, action}, {2, next_time})
@@ -239,5 +281,13 @@ defmodule ElixirQuest.Components do
 
   def add_target(id, target_id) do
     GenServer.cast(__MODULE__, {:target, id, target_id})
+  end
+
+  def add_cooldown(id, action) do
+    GenServer.cast(__MODULE__, {:cooldown, id, action})
+  end
+
+  def remove_target_from_all(entity_id) do
+    GenServer.cast(__MODULE__, {:remove_target_from_all, entity_id})
   end
 end

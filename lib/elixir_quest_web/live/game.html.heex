@@ -1,4 +1,4 @@
-<div class="h-screen bg-blue-200 pt-4">
+<div class="h-screen flex-col bg-blue-200 pt-4">
   <div class="flex justify-center align-center h-5/6 text-3xl bg-green-300"
        phx-window-keydown="move">
     <div class="block w-1/4">
@@ -37,5 +37,11 @@
         Loading...
       </div>
     <% end %>
+  </div>
+  <div class="flex justify-center">
+    <div class="w-1/6 border border-black font-bold text-center py-4 my-4 cursor-pointer select-none"
+         phx-click="attack">
+      Attack!
+    </div>
   </div>
 </div>
