@@ -1,19 +1,22 @@
 # ElixirQuest
 
-To start your Phoenix server:
+ElixirQuest is a 2-D MMORPG game server implementing ECS (Entity-Component-System) architecture.
 
-  * Install dependencies with `mix deps.get`
-  * Create and migrate your database with `mix ecto.setup`
-  * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+Backend uses ETS for active game entities, and Postgres for persistence.
+Frontend uses Phoenix LiveView rendering simple assets.
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+## Goals
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
-
-## Learn more
-
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
+[x] Base ECS implementation
+[x] Game state rendering w/ LiveView
+[/] Simple entity movement
+[x] Wander, aggro, and seek components for mobs
+[/] Attacking
+[x] Entity death
+[ ] Entity respawns
+[ ] Other actions
+[ ] Action logs
+[ ] Game state persistence (postgres)
+[ ] Player accounts
+[ ] Player Chat
+[ ] More robust UI, possibly canvas
