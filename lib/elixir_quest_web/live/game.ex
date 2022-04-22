@@ -138,9 +138,13 @@ defmodule ElixirQuestWeb.Game do
   defp render_cell(nil), do: render_cell("background.png", nil)
 
   defp render_cell(content_id) do
-    :image
-    |> Components.get(content_id)
-    |> render_cell(content_id)
+    # This is kinda hack-y, and is only here to prevent setting the target to a boundary
+    # and then trying to do something that doesn't work, such as attacking it.
+    # TODO: find a better way to prevent targetting boundaries.
+    case Components.get(:image, content_id) do
+      "rock_mount.png" -> render_cell("rock_mount.png", nil)
+      other_filename -> render_cell(other_filename, content_id)
+    end
   end
 
   defp render_cell(image_filename, id) do
