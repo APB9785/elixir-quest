@@ -1,6 +1,0 @@
-- All PCs in a given region
-- Mobs without targets
-- Mobs with targets
-- All moving objects
-- All objects taking * action
-- All objects taking DOT

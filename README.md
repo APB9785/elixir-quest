@@ -7,16 +7,16 @@ Frontend uses Phoenix LiveView rendering simple assets.
 
 ## Goals
 
-[x] Base ECS implementation
-[x] Game state rendering w/ LiveView
-[/] Simple entity movement
-[x] Wander, aggro, and seek components for mobs
-[/] Attacking
-[x] Entity death
-[ ] Entity respawns
-[ ] Other actions
-[ ] Action logs
-[ ] Game state persistence (postgres)
-[ ] Player accounts
-[ ] Player Chat
-[ ] More robust UI, possibly canvas
+* [x] Base ECS implementation  
+* [x] Game state rendering w/ LiveView  
+* [/] Simple entity movement  
+* [x] Wander, aggro, and seek components for mobs  
+* [/] Attacking  
+* [x] Entity death  
+* [ ] Entity respawns  
+* [ ] Other actions  
+* [x] Action logs  
+* [ ] Game state persistence (postgres)  
+* [ ] Player accounts  
+* [ ] Player Chat  
+* [ ] More robust UI, possibly canvas  

@@ -3,6 +3,7 @@ defmodule ElixirQuestWeb.Game do
   use ElixirQuestWeb, :live_view
 
   alias ElixirQuest.Components
+  alias ElixirQuest.Logs
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar
   alias ElixirQuest.Utils
@@ -20,15 +21,23 @@ defmodule ElixirQuestWeb.Game do
 
         spawn_pc(pc)
 
-        # Register for the PubSub to receive server ticks
+        # Register for the PubSub to receive server ticks and action logs.
         PubSub.subscribe(EQPubSub, "tick")
+        PubSub.subscribe(EQPubSub, "logs")
 
-        assign(socket, pc_id: id, pc_name: name, current_hp: pc.current_hp, max_hp: pc.max_hp)
+        assign(socket,
+          pc_id: id,
+          pc_name: name,
+          current_hp: pc.current_hp,
+          max_hp: pc.max_hp,
+          logs: [Logs.from_spawn(name)]
+        )
       else
-        assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil)
+        assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil, logs: [])
       end
 
-    {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil)}
+    {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil),
+     temporary_assigns: [logs: []]}
   end
 
   def handle_event("move", _params, %{assigns: %{move_cooldown: true}} = socket) do
@@ -102,6 +111,10 @@ defmodule ElixirQuestWeb.Game do
 
     {:noreply,
      assign(socket, cells: fresh_cells, current_hp: current_hp, max_hp: max_hp, target: target)}
+  end
+
+  def handle_info({:log_entry, entry}, socket) do
+    {:noreply, assign(socket, logs: [entry])}
   end
 
   def handle_info(:move_cooled, socket) do

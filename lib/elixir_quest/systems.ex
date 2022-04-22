@@ -3,6 +3,7 @@ defmodule ElixirQuest.Systems do
   In this module is the logic and frequency for each game system.
   """
   alias ElixirQuest.Components
+  alias ElixirQuest.Logs
   alias ElixirQuest.Utils
 
   Module.register_attribute(__MODULE__, :frequency, accumulate: true)
@@ -94,6 +95,27 @@ defmodule ElixirQuest.Systems do
     Utils.distance(mob_location, pc_location) <= aggro_range
   end
 
+  @frequency {:death, 10}
+  def death do
+    dead = Components.get_all(:dead)
+
+    Enum.each(dead, fn {id} ->
+      id
+      |> Logs.from_death()
+      |> Logs.broadcast()
+
+      Components.remove_target_from_all(id)
+      Components.remove(:location, id)
+      Components.remove(:seeking, id)
+      Components.remove(:wandering, id)
+      Components.remove(:health, id)
+      Components.remove(:aggro, id)
+      Components.remove(:image, id)
+      Components.remove(:name, id)
+      Components.remove(:dead, id)
+    end)
+  end
+
   @frequency {:actions, 5}
   def actions do
     cooldowns = Components.get_all(:cooldown)
@@ -108,27 +130,14 @@ defmodule ElixirQuest.Systems do
             Components.reset_cooldown(cooldown)
 
           target_id ->
+            id
+            |> Logs.from_attack(target_id, weapon_dmg)
+            |> Logs.broadcast()
+
             Components.decrease_current_hp(target_id, weapon_dmg)
             Components.reset_cooldown(cooldown, weapon_cd)
         end
       end
-    end)
-  end
-
-  @frequency {:death, 10}
-  def death do
-    dead = Components.get_all(:dead)
-
-    Enum.each(dead, fn {id} ->
-      Components.remove(:location, id)
-      Components.remove(:seeking, id)
-      Components.remove(:wandering, id)
-      Components.remove(:health, id)
-      Components.remove(:aggro, id)
-      Components.remove(:image, id)
-      Components.remove(:name, id)
-      Components.remove(:dead, id)
-      Components.remove_target_from_all(id)
     end)
   end
 

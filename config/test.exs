@@ -20,9 +20,6 @@ config :elixir_quest, ElixirQuestWeb.Endpoint,
   secret_key_base: "YDXgyuHxt/LN7dmvjrt3V5H7j6Ir/448X1fQOKEixzVVFJIkUM5wh7Te7GkFjwB0",
   server: false
 
-# In test we don't send emails.
-config :elixir_quest, ElixirQuest.Mailer, adapter: Swoosh.Adapters.Test
-
 # Print only warnings and errors during test
 config :logger, level: :warn
 

@@ -28,23 +28,12 @@ import topbar from "../vendor/topbar"
 
 let Hooks = {}
 
-Hooks.Display = {
-  mounted(){
-    const canvas = this.el;
-    const width = canvas.width = window.innerWidth;
-    const height = canvas.height = window.innerHeight;
-    const ctx = canvas.getContext('2d');
-
-    p = [0, 0, 0];
-
-    ctx.fillStyle = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
-    ctx.fillRect(0, 0, width, height);
-
-    this.handleEvent("draw", ({points}) => {
-      console.log(points[0]);
-      ctx.fillStyle = `rgb(${points[0]}, ${points[1]}, ${points[2]})`;
-      ctx.fillRect(0, 0, width, height);
-    })
+Hooks.LogScroll = {
+  mounted() {
+    this.el.scrollTop = this.el.scrollHeight;
+  },
+  updated() {
+    this.el.scrollTop = this.el.scrollHeight;
   }
 }
 
