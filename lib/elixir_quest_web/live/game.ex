@@ -36,7 +36,7 @@ defmodule ElixirQuestWeb.Game do
         assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil, logs: [])
       end
 
-    {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil),
+    {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil, action: nil),
      temporary_assigns: [logs: []]}
   end
 
@@ -72,9 +72,18 @@ defmodule ElixirQuestWeb.Game do
     {:noreply, socket}
   end
 
-  def handle_event("attack", _, socket) do
-    Components.add_cooldown(socket.assigns.pc_id, :attack)
-    {:noreply, socket}
+  def handle_event("action", %{"action" => action_param}, socket) do
+    %{pc_id: id, action: previous_action} = socket.assigns
+
+    case Utils.atomize(action_param) do
+      ^previous_action ->
+        Components.cancel_action(id, previous_action)
+        {:noreply, assign(socket, action: nil)}
+
+      new_action ->
+        Components.begin_action(id, new_action, previous_action)
+        {:noreply, assign(socket, action: new_action)}
+    end
   end
 
   def handle_info({:tick, _tick}, %{assigns: %{pc_id: pc_id}} = socket) do
@@ -138,12 +147,16 @@ defmodule ElixirQuestWeb.Game do
   defp render_cell(nil), do: render_cell("background.png", nil)
 
   defp render_cell(content_id) do
-    # This is kinda hack-y, and is only here to prevent setting the target to a boundary
-    # and then trying to do something that doesn't work, such as attacking it.
-    # TODO: find a better way to prevent targetting boundaries.
+    # This is kinda hack-y, and is only here to prevent setting the target to a boundary or
+    # to your own character and then trying to do something that doesn't work,
+    # such as attacking it.
+    # TODO: find a better way to prevent targetting boundaries/self.
     case Components.get(:image, content_id) do
-      "rock_mount.png" -> render_cell("rock_mount.png", nil)
-      other_filename -> render_cell(other_filename, content_id)
+      filename when filename in ~w(rock_mount.png knight.png) ->
+        render_cell(filename, nil)
+
+      other_filename ->
+        render_cell(other_filename, content_id)
     end
   end
 
@@ -160,5 +173,15 @@ defmodule ElixirQuestWeb.Game do
 
   defp hp_percent(current, max) do
     current / max * 100
+  end
+
+  defp action_button(button_action, active_action) do
+    base = "w-1/6 border border-black font-bold text-center py-4 my-4 cursor-pointer select-none"
+
+    if active_action == button_action do
+      [base, " bg-gray-300"]
+    else
+      base
+    end
   end
 end

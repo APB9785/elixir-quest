@@ -118,16 +118,16 @@ defmodule ElixirQuest.Systems do
 
   @frequency {:actions, 5}
   def actions do
-    cooldowns = Components.get_all(:cooldown)
+    actions = Components.get_active_actions()
     now = NaiveDateTime.utc_now()
 
-    Enum.each(cooldowns, fn {{id, :attack}, time} = cooldown ->
-      if NaiveDateTime.compare(now, time) == :gt do
+    Enum.each(actions, fn {{id, :attack}, time, active?} = action ->
+      if active? and NaiveDateTime.compare(now, time) == :gt do
         %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Components.get(:equipped, id)
 
         case Components.get(:target, id) do
           nil ->
-            Components.reset_cooldown(cooldown)
+            Components.reset_cooldown(action)
 
           target_id ->
             id
@@ -135,7 +135,7 @@ defmodule ElixirQuest.Systems do
             |> Logs.broadcast()
 
             Components.decrease_current_hp(target_id, weapon_dmg)
-            Components.reset_cooldown(cooldown, weapon_cd)
+            Components.reset_cooldown(action, weapon_cd)
         end
       end
     end)

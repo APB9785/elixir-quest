@@ -33,7 +33,7 @@ defmodule ElixirQuest.Components do
     state = %{
       location: Ets.new!(name: :location),
       health: Ets.new!(name: :health),
-      cooldown: Ets.new!(name: :cooldown),
+      action: Ets.new!(name: :action),
       moving: Ets.new!(name: :moving),
       target: Ets.new!(name: :target),
       seeking: Ets.new!(name: :seeking),
@@ -82,6 +82,7 @@ defmodule ElixirQuest.Components do
         add(:image, id, "knight.png")
         add(:name, id, pc.name)
         add(:equipped, id, %{weapon: %{name: "hands", damage: 1, cooldown: 1000}})
+        add(:action, id, :attack, NaiveDateTime.utc_now())
 
         {:reply, :success, state}
     end
@@ -101,22 +102,38 @@ defmodule ElixirQuest.Components do
     {:noreply, state}
   end
 
-  def handle_cast({:cooldown, id, action}, state) do
-    case get(:cooldown, {id, action}) do
-      nil ->
-        add(:cooldown, id, action, NaiveDateTime.utc_now())
-
-      _ ->
-        :noop
-    end
-
-    {:noreply, state}
-  end
+  # def handle_cast({:cooldown, id, action}, state) do
+  #   case get(:cooldown, {id, action}) do
+  #     nil ->
+  #       add(:cooldown, id, action, NaiveDateTime.utc_now())
+  #
+  #     _ ->
+  #       :noop
+  #   end
+  #
+  #   {:noreply, state}
+  # end
 
   def handle_cast({:remove_target_from_all, target_id}, state) do
     :target
     |> Ets.wrap_existing!()
     |> Ets.match_delete({:_, target_id})
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:begin_action, entity_id, action}, state) do
+    :action
+    |> Ets.wrap_existing!()
+    |> Ets.update_element({entity_id, action}, {3, true})
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:cancel_action, entity_id, action}, state) do
+    :action
+    |> Ets.wrap_existing!()
+    |> Ets.update_element({entity_id, action}, {3, false})
 
     {:noreply, state}
   end
@@ -161,8 +178,8 @@ defmodule ElixirQuest.Components do
   def add(:health, id, hp, max_hp),
     do: :health |> Ets.wrap_existing!() |> Ets.put!({id, hp, max_hp})
 
-  def add(:cooldown, id, action, time),
-    do: :cooldown |> Ets.wrap_existing!() |> Ets.put!({{id, action}, time})
+  def add(:action, entity_id, action, time),
+    do: :action |> Ets.wrap_existing!() |> Ets.put!({{entity_id, action}, time, false})
 
   @doc """
   Removes a component from an entity.
@@ -173,6 +190,12 @@ defmodule ElixirQuest.Components do
   Get all components of a specified type.
   """
   def get_all(component_type), do: component_type |> Ets.wrap_existing!() |> Ets.to_list!()
+
+  def get_active_actions do
+    :action
+    |> Ets.wrap_existing!()
+    |> Ets.match_object!({:_, :_, true})
+  end
 
   @doc """
   Gets a component from the given table by entity ID.
@@ -250,18 +273,19 @@ defmodule ElixirQuest.Components do
   @doc """
   Resets a given cooldown after the action is taken, or when an action fails.
   """
-  def reset_cooldown({{entity_id, action}, _time}) do
+  def reset_cooldown({{entity_id, action}, _time, _active?}) do
     next_time = NaiveDateTime.utc_now()
     do_reset_cooldown(entity_id, action, next_time)
   end
 
-  def reset_cooldown({{entity_id, action}, time}, cooldown) do
-    next_time = NaiveDateTime.add(time, cooldown, :millisecond)
+  def reset_cooldown({{entity_id, action}, _time, _active?}, cooldown) do
+    now = NaiveDateTime.utc_now()
+    next_time = NaiveDateTime.add(now, cooldown, :millisecond)
     do_reset_cooldown(entity_id, action, next_time)
   end
 
   defp do_reset_cooldown(entity_id, action, next_time) do
-    :cooldown
+    :action
     |> Ets.wrap_existing!()
     |> Ets.update_element!({entity_id, action}, {2, next_time})
   end
@@ -283,11 +307,16 @@ defmodule ElixirQuest.Components do
     GenServer.cast(__MODULE__, {:target, id, target_id})
   end
 
-  def add_cooldown(id, action) do
-    GenServer.cast(__MODULE__, {:cooldown, id, action})
-  end
-
   def remove_target_from_all(entity_id) do
     GenServer.cast(__MODULE__, {:remove_target_from_all, entity_id})
+  end
+
+  def begin_action(entity_id, action, previous) do
+    if previous, do: cancel_action(entity_id, previous)
+    GenServer.cast(__MODULE__, {:begin_action, entity_id, action})
+  end
+
+  def cancel_action(entity_id, action) do
+    GenServer.cast(__MODULE__, {:cancel_action, entity_id, action})
   end
 end

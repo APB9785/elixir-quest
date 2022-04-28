@@ -49,8 +49,10 @@
     <% end %>
   </div>
   <div class="flex justify-center">
-    <div class="w-1/6 border border-black font-bold text-center py-4 my-4 cursor-pointer select-none"
-         phx-click="attack">
+    <div id="attack-button"
+         class={action_button(:attack, @action)}
+         phx-click="action"
+         phx-value-action="attack">
       Attack!
     </div>
   </div>

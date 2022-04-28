@@ -39,4 +39,6 @@ defmodule ElixirQuest.Utils do
       if dy > 0, do: :north, else: :south
     end
   end
+
+  def atomize("attack"), do: :attack
 end
