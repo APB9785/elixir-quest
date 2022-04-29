@@ -3,9 +3,14 @@ defmodule ElixirQuestWeb.Game do
   use ElixirQuestWeb, :live_view
 
   alias ElixirQuest.Components
+  alias ElixirQuest.Components.Health
+  alias ElixirQuest.Components.Image
+  alias ElixirQuest.Components.Location
+  alias ElixirQuest.Components.Name
+  alias ElixirQuest.Components.Target
   alias ElixirQuest.Logs
   alias ElixirQuest.PlayerChars
-  alias ElixirQuest.PlayerChars.PlayerChar
+  alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Utils
 
   alias Phoenix.LiveView.JS
@@ -17,7 +22,7 @@ defmodule ElixirQuestWeb.Game do
     socket =
       if connected?(socket) do
         # Temporary lookup until accounts are setup (then id will be read from accounts table)
-        %PlayerChar{id: id, name: name} = pc = PlayerChars.get_by_name("dude")
+        %PC{id: id, name: name} = pc = PlayerChars.get_by_name("dude")
 
         spawn_pc(pc)
 
@@ -55,10 +60,10 @@ defmodule ElixirQuestWeb.Game do
       end
 
     unless direction == :error do
-      {region_id, {x, y}} = Components.get(:location, pc_id)
-      destination = Utils.adjacent_coord({x, y}, direction)
+      {region_id, x, y} = Location.get(pc_id)
+      {destination_x, destination_y} = Utils.adjacent_coord({x, y}, direction)
 
-      Components.attempt_move(pc_id, region_id, destination)
+      Components.attempt_move(pc_id, region_id, destination_x, destination_y)
     end
 
     # The cooldown prevents corrupting the ETS tables with extremely rapid movement input
@@ -88,17 +93,17 @@ defmodule ElixirQuestWeb.Game do
 
   def handle_info({:tick, _tick}, %{assigns: %{pc_id: pc_id}} = socket) do
     # TODO: framerate reduction option?
-    {current_hp, max_hp} = Components.get(:health, pc_id)
-    {region_id, {x, y}} = Components.get(:location, pc_id)
+    {current_hp, max_hp} = Health.get(pc_id)
+    {region_id, x, y} = Location.get(pc_id)
 
     target =
-      case Components.get(:target, pc_id) do
+      case Target.get(pc_id) do
         nil ->
           # PC has no target
           nil
 
         target_id ->
-          case Components.get(:health, target_id) do
+          case Health.get(target_id) do
             nil ->
               # No health means this is probably region boundary entity
               nil
@@ -108,7 +113,7 @@ defmodule ElixirQuestWeb.Game do
               %{
                 current_hp: current,
                 max_hp: max,
-                name: Components.get(:name, target_id)
+                name: Name.get(target_id)
               }
           end
       end
@@ -116,7 +121,7 @@ defmodule ElixirQuestWeb.Game do
     fresh_cells =
       {x, y}
       |> Utils.calculate_nearby_coords()
-      |> Enum.map(&Components.search_location(region_id, &1))
+      |> Enum.map(fn {x, y} -> Location.search(region_id, x, y) end)
 
     {:noreply,
      assign(socket, cells: fresh_cells, current_hp: current_hp, max_hp: max_hp, target: target)}
@@ -130,7 +135,7 @@ defmodule ElixirQuestWeb.Game do
     {:noreply, assign(socket, move_cooldown: false)}
   end
 
-  defp spawn_pc(%PlayerChar{id: id} = pc) do
+  defp spawn_pc(%PC{id: id} = pc) do
     case Components.spawn_pc(pc) do
       :blocked ->
         Process.sleep(1000)
@@ -151,7 +156,7 @@ defmodule ElixirQuestWeb.Game do
     # to your own character and then trying to do something that doesn't work,
     # such as attacking it.
     # TODO: find a better way to prevent targetting boundaries/self.
-    case Components.get(:image, content_id) do
+    case Image.get(content_id) do
       filename when filename in ~w(rock_mount.png knight.png) ->
         render_cell(filename, nil)
 

@@ -2,7 +2,7 @@ defmodule ElixirQuest.Logs do
   @moduledoc """
   Functions for generating action logs.
   """
-  alias ElixirQuest.Components
+  alias ElixirQuest.Components.Name
 
   alias Phoenix.PubSub
 
@@ -14,8 +14,8 @@ defmodule ElixirQuest.Logs do
   def broadcast(log), do: PubSub.broadcast(EQPubSub, "logs", {:log_entry, log})
 
   def from_attack(id, target_id, damage) do
-    self_name = Components.get(:name, id)
-    target_name = Components.get(:name, target_id)
+    self_name = Name.get(id)
+    target_name = Name.get(target_id)
 
     %{
       id: make_id(),
@@ -31,7 +31,7 @@ defmodule ElixirQuest.Logs do
   end
 
   def from_death(id) do
-    name = Components.get(:name, id)
+    name = Name.get(id)
 
     %{
       id: make_id(),
