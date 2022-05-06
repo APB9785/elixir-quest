@@ -13,10 +13,12 @@ defmodule ElixirQuest.Systems do
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.PlayerChar
+  alias ElixirQuest.Components.Respawn
   alias ElixirQuest.Components.Seeking
   alias ElixirQuest.Components.Target
   alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Logs
+  alias ElixirQuest.Mobs
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.Utils
 
@@ -126,6 +128,8 @@ defmodule ElixirQuest.Systems do
       Image.remove(id)
       Name.remove(id)
       Dead.remove(id)
+
+      Respawn.add(id)
     end)
   end
 
@@ -174,6 +178,21 @@ defmodule ElixirQuest.Systems do
       }
 
       PlayerChars.save(pc_id, attrs)
+    end)
+  end
+
+  @frequency {:respawn, 1000}
+  def respawn do
+    now = NaiveDateTime.utc_now()
+    respawns = Respawn.get_all()
+
+    Enum.each(respawns, fn {entity_id, respawn_at} ->
+      if NaiveDateTime.compare(respawn_at, now) == :lt do
+        entity_id
+        |> tap(&Respawn.remove(&1))
+        |> Mobs.get!()
+        |> Mobs.spawn()
+      end
     end)
   end
 

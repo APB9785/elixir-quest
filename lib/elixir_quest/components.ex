@@ -22,11 +22,11 @@ defmodule ElixirQuest.Components do
   alias ElixirQuest.Components.Moving
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.PlayerChar
+  alias ElixirQuest.Components.Respawn
   alias ElixirQuest.Components.Seeking
   alias ElixirQuest.Components.Target
   alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Mobs
-  alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
   alias ElixirQuest.Systems
@@ -57,6 +57,7 @@ defmodule ElixirQuest.Components do
       moving: Moving.initialize_table(),
       name: Name.initialize_table(),
       player_char: PlayerChar.initialize_table(),
+      respawn: Respawn.initialize_table(),
       seeking: Seeking.initialize_table(),
       target: Target.initialize_table(),
       wandering: Wandering.initialize_table()
@@ -69,14 +70,7 @@ defmodule ElixirQuest.Components do
     mobs = Mobs.load_all()
     regions = Regions.load_all()
 
-    Enum.each(mobs, fn %Mob{id: id} = mob ->
-      Location.add(id, mob.region_id, mob.x_pos, mob.y_pos)
-      Health.add(id, mob.max_hp, mob.max_hp)
-      Wandering.add(id)
-      Aggro.add(id, mob.aggro_range)
-      Image.add(id, "goblin.png")
-      Name.add(id, mob.name)
-    end)
+    Enum.each(mobs, &Mobs.spawn/1)
 
     Enum.each(regions, &Regions.load_boundaries/1)
 

@@ -4,6 +4,12 @@ defmodule ElixirQuest.Mobs do
   """
   import Ecto.Query
 
+  alias ElixirQuest.Components.Aggro
+  alias ElixirQuest.Components.Health
+  alias ElixirQuest.Components.Image
+  alias ElixirQuest.Components.Location
+  alias ElixirQuest.Components.Name
+  alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.Repo
 
@@ -12,6 +18,8 @@ defmodule ElixirQuest.Mobs do
     |> Mob.changeset(attrs)
     |> Repo.insert!()
   end
+
+  def get!(mob_id), do: Repo.get!(Mob, mob_id)
 
   @doc """
   Loads all mobs.
@@ -33,5 +41,17 @@ defmodule ElixirQuest.Mobs do
         where: m.region_id == ^region_id,
         select: m.id
     )
+  end
+
+  @doc """
+  Spawn a mob by inserting all its necessary components.
+  """
+  def spawn(%Mob{id: id} = mob) do
+    Location.add(id, mob.region_id, mob.x_pos, mob.y_pos)
+    Health.add(id, mob.max_hp, mob.max_hp)
+    Wandering.add(id)
+    Aggro.add(id, mob.aggro_range)
+    Image.add(id, "goblin.png")
+    Name.add(id, mob.name)
   end
 end

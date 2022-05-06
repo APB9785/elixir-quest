@@ -1,6 +1,9 @@
 defmodule ElixirQuest.Components.Action do
   @moduledoc """
-  Helpers for running ETS queries for the Action components
+  Any actions which can be taken by an Entity will be represented by an Action component.
+  Since most Entities will have several possible actions, we use a Bag table.
+  Each action will have a timestamp to represent the "cooldown" time, and a boolean flag to
+  show whether the Entity is actively taking the action.
   """
   alias ETS.Bag, as: Ets
 
