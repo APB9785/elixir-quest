@@ -1,6 +1,8 @@
 defmodule ElixirQuest.Systems do
   @moduledoc """
   In this module is the logic and frequency for each game system.
+
+  TODO: split each system into its own module.
   """
   alias ElixirQuest.Components.Action
   alias ElixirQuest.Components.Aggro

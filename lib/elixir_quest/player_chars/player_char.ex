@@ -1,6 +1,6 @@
 defmodule ElixirQuest.PlayerChars.PlayerChar do
   @moduledoc """
-  The %PlayerChar{} schema.
+  The PlayerChar schema persists player data, which is fetched when the PC is spawned.
   """
   use Ecto.Schema
   import Ecto.Changeset

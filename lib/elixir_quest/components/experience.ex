@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Experience do
   @moduledoc """
-  Helpers for running ETS queries for the Experience components
+  PC entities each have an Experience component to hold their current xp total.
   """
   alias ETS.Set, as: Ets
 

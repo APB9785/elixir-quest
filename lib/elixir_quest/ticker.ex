@@ -1,6 +1,7 @@
 defmodule ElixirQuest.Ticker do
   @moduledoc """
-  A server for broadcasting PubSub ticks.
+  Broadcasts server ticks over PubSub, to be consumed by LiveView clients and the
+  Components manager (which runs the Systems).
   """
   use GenServer
 

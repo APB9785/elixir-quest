@@ -1,5 +1,7 @@
 defmodule ElixirQuestWeb.Game do
-  @moduledoc false
+  @moduledoc """
+  The LiveView client.
+  """
   use ElixirQuestWeb, :live_view
 
   alias ElixirQuest.Components

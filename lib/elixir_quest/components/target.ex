@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Target do
   @moduledoc """
-  Helpers for running ETS queries for the Target components
+  When an entity targets another entity, this component is added to associate the two.
   """
   alias ETS.Set, as: Ets
 

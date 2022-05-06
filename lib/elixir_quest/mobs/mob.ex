@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Mobs.Mob do
   @moduledoc """
-  The %Mob{} schema.
+  The Mob schema represents the initial values for each mob when it spawns.
   """
   use Ecto.Schema
   import Ecto.Changeset

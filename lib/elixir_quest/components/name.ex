@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Name do
   @moduledoc """
-  Helpers for running ETS queries for the Name components
+  All entities which can be targeted should have a Name component with the name to be displayed.
   """
   alias ETS.Set, as: Ets
 

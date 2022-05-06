@@ -1,6 +1,7 @@
 defmodule ElixirQuest.Components.Equipment do
   @moduledoc """
-  Helpers for running ETS queries for the Equipment components
+  Any entity equipped with weapons or armor will have an Equipment component which holds
+  a map of the names and stats for these items.
   """
   alias ETS.KeyValueSet, as: Ets
 

@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Level do
   @moduledoc """
-  Helpers for running ETS queries for the Level components
+  Most living entities will have a Level component to represent their combat power.
   """
   alias ETS.Set, as: Ets
 

@@ -1,12 +1,11 @@
 defmodule ElixirQuest.Components do
   @moduledoc """
-  This server holds a map of lists representing "Components" in the ECS pattern.
-  Systems will access a component list in order to have an index of all objects which
-  contain the desired component.
+  The Components server spanws and owns all Component tables.  No other process may write to the
+  tables - this ensures activity is serialized to prevent race conditions.
 
-  For example, if the component is "Poison", then the list will hold the ids of each
-  object which is currently poisoned. Each tick, the poison system will apply damage
-  to all of the objects whose ids are on the list.
+  Each tick, this server will run the appropriate Systems, writing the updates as it goes.
+
+  Updates from the LiveView clients will use a standard GenServer API.
   """
   use GenServer
 
@@ -144,7 +143,7 @@ defmodule ElixirQuest.Components do
     {:noreply, state}
   end
 
-  ## Client API
+  ## LiveView Client API
 
   @doc """
   Spawns a Player Character.

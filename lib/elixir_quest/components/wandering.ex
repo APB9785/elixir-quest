@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Wandering do
   @moduledoc """
-  Helpers for running ETS queries for the Wandering components
+  This component is added to any mobs which are not currently aggro'ed to a target.
   """
   alias ETS.Set, as: Ets
 

@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Moving do
   @moduledoc """
-  Helpers for running ETS queries for the Moving components
+  Currently unused.
   """
   alias ETS.Set, as: Ets
 

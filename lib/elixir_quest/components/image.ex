@@ -1,6 +1,7 @@
 defmodule ElixirQuest.Components.Image do
   @moduledoc """
-  Helpers for running ETS queries for the Image components
+  Any entity which is to be rendered in the display must have an Image component which
+  holds the filename for its graphic.
   """
   alias ETS.Set, as: Ets
 

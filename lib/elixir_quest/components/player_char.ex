@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.PlayerChar do
   @moduledoc """
-  Helpers for running ETS queries for the PlayerChar components
+  The PlayerChar component simply tags an entity as a PC.
   """
   alias ETS.Set, as: Ets
 

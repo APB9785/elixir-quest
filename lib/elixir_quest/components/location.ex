@@ -1,6 +1,7 @@
 defmodule ElixirQuest.Components.Location do
   @moduledoc """
-  Helpers for running ETS queries for the Location components
+  All entities which physically exist in the game world will have a Location component
+  with the id of its region and the x/y coordinates where it are currently located.
   """
   alias ETS.Set, as: Ets
 

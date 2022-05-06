@@ -1,6 +1,7 @@
 defmodule ElixirQuest.Components.Seeking do
   @moduledoc """
-  Helpers for running ETS queries for the Seeking components
+  When a mob is aggro'ed to a PC, it will gain a Seeking component, which marks that it
+  should cease its default behavior and instead move towards its target and attack.
   """
   alias ETS.Set, as: Ets
 

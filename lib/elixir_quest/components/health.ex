@@ -1,6 +1,6 @@
 defmodule ElixirQuest.Components.Health do
   @moduledoc """
-  Helpers for running ETS queries for the Health components
+  All living entities have a Health component which tracks their current hp and maximum hp.
   """
   alias ElixirQuest.Components.Dead
   alias ETS.Set, as: Ets

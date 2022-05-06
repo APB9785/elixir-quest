@@ -1,5 +1,9 @@
 defmodule ElixirQuest.Regions.Region do
-  @moduledoc false
+  @moduledoc """
+  The Region schema gives an ID to each region which is used as a foreign key for associating
+  with the entities inhabiting the region.  It also contains the map for where the boundaries
+  are and the display name for the region.
+  """
   use Ecto.Schema
   import Ecto.Changeset
   alias ElixirQuest.Mobs.Mob
