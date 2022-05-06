@@ -151,7 +151,10 @@ defmodule ElixirQuest.Systems do
             |> Logs.from_attack(target_id, weapon_dmg)
             |> Logs.broadcast()
 
-            Health.decrease_current_hp(target_id, weapon_dmg)
+            new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
+
+            if new_hp <= 0, do: Dead.add(entity_id)
+
             Action.reset_cooldown(action, weapon_cd)
         end
       end

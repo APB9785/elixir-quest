@@ -35,13 +35,10 @@ defmodule ElixirQuest.Components.Health do
     {current_hp, _max_hp} = get(entity_id)
     table = Ets.wrap_existing!(__MODULE__)
 
-    case current_hp - amount do
-      new_hp when new_hp <= 0 ->
-        Dead.add(entity_id)
-        Ets.update_element!(table, entity_id, {2, 0})
+    new_hp = current_hp - amount
 
-      new_hp ->
-        Ets.update_element!(table, entity_id, {2, new_hp})
-    end
+    Ets.update_element!(table, entity_id, {2, new_hp})
+
+    new_hp
   end
 end
