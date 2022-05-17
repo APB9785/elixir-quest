@@ -4,8 +4,9 @@ defmodule ElixirQuest.Systems do
 
   TODO: split each system into its own module.
   """
-  alias ElixirQuest.Components.Action
   alias ElixirQuest.Components.Aggro
+  alias ElixirQuest.Components.Attacking
+  alias ElixirQuest.Components.Cooldown
   alias ElixirQuest.Components.Dead
   alias ElixirQuest.Components.Equipment
   alias ElixirQuest.Components.Experience
@@ -13,61 +14,86 @@ defmodule ElixirQuest.Systems do
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Level
   alias ElixirQuest.Components.Location
+  alias ElixirQuest.Components.Moving
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.PlayerChar
   alias ElixirQuest.Components.Respawn
   alias ElixirQuest.Components.Seeking
-  alias ElixirQuest.Components.Target
   alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Logs
   alias ElixirQuest.Mobs
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.Utils
 
+  @movement_cooldown 250
+
   Module.register_attribute(__MODULE__, :frequency, accumulate: true)
 
-  @frequency {:seek, 40}
+  @frequency {:prune_cooldowns, 1}
+  def prune_cooldowns do
+    cooldowns = Cooldown.get_all()
+    now = NaiveDateTime.utc_now()
+
+    Enum.each(cooldowns, fn {entity_id, action, timestamp} ->
+      if NaiveDateTime.compare(now, timestamp) == :gt do
+        Cooldown.remove(entity_id, action)
+      end
+    end)
+  end
+
+  @frequency {:movement, 1}
+  def movement do
+    moving = Moving.get_all()
+
+    Enum.each(moving, fn {entity_id, direction} ->
+      if Cooldown.ready?(entity_id, :move) do
+        {region_id, x, y} = Location.get(entity_id)
+        {destination_x, destination_y} = Utils.adjacent_coord({x, y}, direction)
+
+        unless Location.occupied?(region_id, destination_x, destination_y) do
+          now = NaiveDateTime.utc_now()
+          next_move_time = NaiveDateTime.add(now, @movement_cooldown, :millisecond)
+          Location.update(entity_id, destination_x, destination_y)
+          Cooldown.add(entity_id, :move, next_move_time)
+        end
+      end
+    end)
+  end
+
+  @frequency {:seek, 5}
   def seek do
     seeking = Seeking.get_all()
 
-    Enum.each(seeking, fn mob_id ->
+    Enum.each(seeking, fn {mob_id, target_id} ->
       {region_id, x, y} = Location.get(mob_id)
-      target_id = Target.get(mob_id)
       {^region_id, target_x, target_y} = Location.get(target_id)
 
       # TODO: handle if target is no longer in the same region as the seeker
 
       direction = Utils.solve_direction({x, y}, {target_x, target_y})
-      {destination_x, destination_y} = Utils.adjacent_coord({x, y}, direction)
-
-      unless Location.occupied?(region_id, destination_x, destination_y) do
-        Location.update(mob_id, destination_x, destination_y)
-      end
 
       # TODO: Look for alternate path if blocked?
+
+      Moving.add(mob_id, direction)
     end)
   end
 
-  @frequency {:wander, 50}
+  @frequency {:wander, 15}
   def wander do
     wandering = Wandering.get_all()
 
     Enum.each(wandering, fn mob_id ->
-      {region_id, x, y} = Location.get(mob_id)
       direction = Enum.random([:north, :south, :east, :west])
-      {destination_x, destination_y} = Utils.adjacent_coord({x, y}, direction)
 
       # TODO: check if destination is blocked; if so try another.
       # However, it could be desirable to not implement this, if we want
       # mobs to spend more time near the walls.
 
-      unless Location.occupied?(region_id, destination_x, destination_y) do
-        Location.update(mob_id, destination_x, destination_y)
-      end
+      Moving.add(mob_id, direction)
     end)
   end
 
-  @frequency {:aggro, 50}
+  @frequency {:aggro, 5}
   def aggro do
     aggro_mobs = Aggro.get_all_with_ids()
     pc_ids = PlayerChar.get_all()
@@ -79,31 +105,25 @@ defmodule ElixirQuest.Systems do
       end)
 
     Enum.each(aggro_mobs, fn {mob_id, aggro_range} ->
-      case Target.get(mob_id) do
-        nil ->
-          {mob_region, mob_x, mob_y} = Location.get(mob_id)
+      unless Seeking.has_target?(mob_id) do
+        {mob_region, mob_x, mob_y} = Location.get(mob_id)
 
-          case Map.get(pcs_with_coords_by_region, mob_region) do
-            nil ->
-              # No PCs in this region
-              :noop
+        case Map.get(pcs_with_coords_by_region, mob_region) do
+          nil ->
+            # No PCs in this region
+            :noop
 
-            local_pcs ->
-              case Enum.find(local_pcs, &within_aggro_range?(&1, {mob_x, mob_y}, aggro_range)) do
-                nil ->
-                  # All PCs are out of range
-                  :noop
+          local_pcs ->
+            case Enum.find(local_pcs, &within_aggro_range?(&1, {mob_x, mob_y}, aggro_range)) do
+              nil ->
+                # All PCs are out of range
+                :noop
 
-                {pc_id, _x, _y} ->
-                  Target.add(mob_id, pc_id)
-                  Wandering.remove(mob_id)
-                  Seeking.add(mob_id)
-              end
-          end
-
-        _ ->
-          # Mob already has a target
-          :noop
+              {pc_id, _x, _y} ->
+                Wandering.remove(mob_id)
+                Seeking.add(mob_id, pc_id)
+            end
+        end
       end
     end)
   end
@@ -112,7 +132,7 @@ defmodule ElixirQuest.Systems do
     Utils.distance({mob_x, mob_y}, {pc_x, pc_y}) <= aggro_range
   end
 
-  @frequency {:death, 10}
+  @frequency {:death, 1}
   def death do
     dead = Dead.get_all()
 
@@ -121,7 +141,6 @@ defmodule ElixirQuest.Systems do
       |> Logs.from_death()
       |> Logs.broadcast()
 
-      Target.remove_from_all(id)
       Location.remove(id)
       Seeking.remove(id)
       Wandering.remove(id)
@@ -130,40 +149,47 @@ defmodule ElixirQuest.Systems do
       Image.remove(id)
       Name.remove(id)
       Dead.remove(id)
+      Moving.remove(id)
 
       Respawn.add(id)
     end)
   end
 
-  @frequency {:actions, 5}
-  def actions do
-    active_actions = Action.get_all_active()
-    now = NaiveDateTime.utc_now()
+  @frequency {:attacks, 1}
+  def attacks do
+    attacks = Attacking.get_all()
 
-    Enum.each(active_actions, fn {id, :attack, time, true} = action ->
-      if NaiveDateTime.compare(now, time) == :gt do
-        %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Equipment.get(id)
+    Enum.each(attacks, fn {attacker_id, target_id} ->
+      cond do
+        !Cooldown.ready?(attacker_id, :attack) ->
+          :noop
 
-        case Target.get(id) do
-          nil ->
-            Action.reset_cooldown(action)
+        Respawn.has_component?(target_id) or Dead.has_component?(target_id) ->
+          unless PlayerChar.has_component?(attacker_id) do
+            Seeking.remove(attacker_id)
+            Wandering.add(attacker_id)
+          end
 
-          target_id ->
-            id
-            |> Logs.from_attack(target_id, weapon_dmg)
-            |> Logs.broadcast()
+          Attacking.remove(attacker_id)
 
-            new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
+        :otherwise ->
+          %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Equipment.get(attacker_id)
 
-            if new_hp <= 0, do: Dead.add(entity_id)
+          next_attack = NaiveDateTime.utc_now() |> NaiveDateTime.add(weapon_cd, :millisecond)
+          Cooldown.add(attacker_id, :attack, next_attack)
 
-            Action.reset_cooldown(action, weapon_cd)
-        end
+          attacker_id
+          |> Logs.from_attack(target_id, weapon_dmg)
+          |> Logs.broadcast()
+
+          new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
+
+          if new_hp <= 0, do: Dead.add(target_id)
       end
     end)
   end
 
-  @frequency {:backup_state, 1000}
+  @frequency {:backup_state, 250}
   def backup_state do
     pc_ids = PlayerChar.get_all()
 
@@ -186,7 +212,7 @@ defmodule ElixirQuest.Systems do
     end)
   end
 
-  @frequency {:respawn, 1000}
+  @frequency {:respawn, 100}
   def respawn do
     now = NaiveDateTime.utc_now()
     respawns = Respawn.get_all()
@@ -195,6 +221,7 @@ defmodule ElixirQuest.Systems do
       if NaiveDateTime.compare(respawn_at, now) == :lt do
         entity_id
         |> tap(&Respawn.remove(&1))
+        |> tap(&Dead.remove(&1))
         |> Mobs.get!()
         |> Mobs.spawn()
       end

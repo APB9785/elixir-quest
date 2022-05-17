@@ -2,7 +2,6 @@ defmodule ElixirQuest.Components.Health do
   @moduledoc """
   All living entities have a Health component which tracks their current hp and maximum hp.
   """
-  alias ElixirQuest.Components.Dead
   alias ETS.Set, as: Ets
 
   def initialize_table, do: Ets.new!(name: __MODULE__)

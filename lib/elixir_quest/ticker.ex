@@ -11,7 +11,7 @@ defmodule ElixirQuest.Ticker do
 
   require Logger
 
-  @base_tick_rate 25
+  @base_tick_rate 50
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)

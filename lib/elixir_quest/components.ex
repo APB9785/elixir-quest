@@ -9,8 +9,9 @@ defmodule ElixirQuest.Components do
   """
   use GenServer
 
-  alias ElixirQuest.Components.Action
   alias ElixirQuest.Components.Aggro
+  alias ElixirQuest.Components.Attacking
+  alias ElixirQuest.Components.Cooldown
   alias ElixirQuest.Components.Dead
   alias ElixirQuest.Components.Equipment
   alias ElixirQuest.Components.Experience
@@ -23,7 +24,6 @@ defmodule ElixirQuest.Components do
   alias ElixirQuest.Components.PlayerChar
   alias ElixirQuest.Components.Respawn
   alias ElixirQuest.Components.Seeking
-  alias ElixirQuest.Components.Target
   alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Mobs
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
@@ -35,6 +35,9 @@ defmodule ElixirQuest.Components do
 
   @system_frequencies Systems.frequencies()
 
+  @pc_image_filename "knight.png"
+  @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000}
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
@@ -44,8 +47,9 @@ defmodule ElixirQuest.Components do
     PubSub.subscribe(EQPubSub, "tick")
 
     state = %{
-      action: Action.initialize_table(),
       aggro: Aggro.initialize_table(),
+      attacking: Attacking.initialize_table(),
+      cooldown: Cooldown.initialize_table(),
       dead: Dead.initialize_table(),
       equipment: Equipment.initialize_table(),
       experience: Experience.initialize_table(),
@@ -53,12 +57,11 @@ defmodule ElixirQuest.Components do
       image: Image.initialize_table(),
       level: Level.initialize_table(),
       location: Location.initialize_table(),
-      moving: Moving.initialize_table(),
+      movement: Moving.initialize_table(),
       name: Name.initialize_table(),
       player_char: PlayerChar.initialize_table(),
       respawn: Respawn.initialize_table(),
       seeking: Seeking.initialize_table(),
-      target: Target.initialize_table(),
       wandering: Wandering.initialize_table()
     }
 
@@ -90,43 +93,34 @@ defmodule ElixirQuest.Components do
         PlayerChar.add(id)
         Level.add(id, pc.level)
         Experience.add(id, pc.experience)
-        Image.add(id, "knight.png")
+        Image.add(id, @pc_image_filename)
         Name.add(id, pc.name)
-        Equipment.add(id, %{weapon: %{name: "hands", damage: 1, cooldown: 1000}})
-        Action.add(id, :attack, NaiveDateTime.utc_now(), false)
+        Equipment.add(id, %{weapon: @weapon_hands_stats})
 
         {:reply, :success, state}
     end
   end
 
-  def handle_cast({:move, entity_id, region_id, x, y}, state) do
-    unless Location.occupied?(region_id, x, y) do
-      Location.update(entity_id, x, y)
-    end
+  def handle_cast({:add_moving, entity_id, direction}, state) do
+    Moving.add(entity_id, direction)
 
     {:noreply, state}
   end
 
-  def handle_cast({:target, entity_id, target_id}, state) do
-    Target.add(entity_id, target_id)
+  def handle_cast({:remove_moving, entity_id}, state) do
+    Moving.remove(entity_id)
 
     {:noreply, state}
   end
 
-  def handle_cast({:remove_target_from_all, target_id}, state) do
-    Target.remove_from_all(target_id)
+  def handle_cast({:begin_attack, entity_id, target_id}, state) do
+    Attacking.add(entity_id, target_id)
 
     {:noreply, state}
   end
 
-  def handle_cast({:begin_action, entity_id, action}, state) do
-    Action.activate(entity_id, action)
-
-    {:noreply, state}
-  end
-
-  def handle_cast({:cancel_action, entity_id, action}, state) do
-    Action.deactivate(entity_id, action)
+  def handle_cast({:cancel_attack, entity_id}, state) do
+    Attacking.remove(entity_id)
 
     {:noreply, state}
   end
@@ -152,24 +146,19 @@ defmodule ElixirQuest.Components do
     GenServer.call(__MODULE__, {:spawn_pc, pc})
   end
 
-  def attempt_move(entity_id, region_id, x, y) do
-    GenServer.cast(__MODULE__, {:move, entity_id, region_id, x, y})
+  def add_moving(entity_id, direction) do
+    GenServer.cast(__MODULE__, {:add_moving, entity_id, direction})
   end
 
-  def add_target(entity_id, target_id) do
-    GenServer.cast(__MODULE__, {:target, entity_id, target_id})
+  def remove_moving(entity_id) do
+    GenServer.cast(__MODULE__, {:remove_moving, entity_id})
   end
 
-  def remove_target_from_all(entity_id) do
-    GenServer.cast(__MODULE__, {:remove_target_from_all, entity_id})
+  def begin_attack(entity_id, target_id) do
+    GenServer.cast(__MODULE__, {:begin_attack, entity_id, target_id})
   end
 
-  def begin_action(entity_id, action, previous) do
-    if previous, do: cancel_action(entity_id, previous)
-    GenServer.cast(__MODULE__, {:begin_action, entity_id, action})
-  end
-
-  def cancel_action(entity_id, action) do
-    GenServer.cast(__MODULE__, {:cancel_action, entity_id, action})
+  def cancel_attack(entity_id) do
+    GenServer.cast(__MODULE__, {:cancel_attack, entity_id})
   end
 end

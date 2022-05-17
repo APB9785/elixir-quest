@@ -9,7 +9,6 @@ defmodule ElixirQuestWeb.Game do
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Components.Name
-  alias ElixirQuest.Components.Target
   alias ElixirQuest.Logs
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
@@ -17,8 +16,6 @@ defmodule ElixirQuestWeb.Game do
 
   alias Phoenix.LiveView.JS
   alias Phoenix.PubSub
-
-  @movement_cooldown 25
 
   def mount(_, _, socket) do
     socket =
@@ -43,53 +40,67 @@ defmodule ElixirQuestWeb.Game do
         assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil, logs: [])
       end
 
-    {:ok, assign(socket, cells: nil, move_cooldown: false, target: nil, action: nil),
-     temporary_assigns: [logs: []]}
+    {:ok,
+     assign(socket,
+       cells: nil,
+       target_id: nil,
+       move_direction: nil,
+       target: nil,
+       attacking?: false
+     ), temporary_assigns: [logs: []]}
   end
 
-  def handle_event("move", _params, %{assigns: %{move_cooldown: true}} = socket) do
-    {:noreply, socket}
-  end
+  def handle_event("start_move", %{"key" => key}, socket) do
+    %{pc_id: pc_id, move_direction: current_direction} = socket.assigns
 
-  def handle_event("move", %{"key" => key}, %{assigns: %{pc_id: pc_id}} = socket) do
-    direction =
-      cond do
-        key == "ArrowLeft" or key == "a" -> :west
-        key == "ArrowRight" or key == "d" -> :east
-        key == "ArrowUp" or key == "w" -> :north
-        key == "ArrowDown" or key == "s" -> :south
-        :otherwise -> :error
-      end
+    parsed_input = Utils.parse_direction(key)
 
-    unless direction == :error do
-      {region_id, x, y} = Location.get(pc_id)
-      {destination_x, destination_y} = Utils.adjacent_coord({x, y}, direction)
+    case Utils.merge_directions(parsed_input, current_direction) do
+      ^current_direction ->
+        {:noreply, socket}
 
-      Components.attempt_move(pc_id, region_id, destination_x, destination_y)
+      new_direction ->
+        Components.add_moving(pc_id, new_direction)
+        {:noreply, assign(socket, move_direction: new_direction)}
     end
-
-    # The cooldown prevents corrupting the ETS tables with extremely rapid movement input
-    Process.send_after(self(), :move_cooled, @movement_cooldown)
-
-    {:noreply, assign(socket, move_cooldown: true)}
   end
 
-  def handle_event("target", %{"id" => id}, socket) do
-    Components.add_target(socket.assigns.pc_id, id)
-    {:noreply, socket}
+  def handle_event("stop_move", %{"key" => key}, socket) do
+    %{pc_id: pc_id, move_direction: current_direction} = socket.assigns
+
+    parsed_input = Utils.parse_direction(key)
+
+    case Utils.remove_direction(parsed_input, current_direction) do
+      ^current_direction ->
+        {:noreply, socket}
+
+      nil ->
+        Components.remove_moving(pc_id)
+        {:noreply, assign(socket, move_direction: nil)}
+
+      new_direction ->
+        Components.add_moving(pc_id, new_direction)
+        {:noreply, assign(socket, move_direction: new_direction)}
+    end
   end
 
-  def handle_event("action", %{"action" => action_param}, socket) do
-    %{pc_id: id, action: previous_action} = socket.assigns
+  def handle_event("target", %{"id" => target_id}, socket) do
+    %{attacking?: attacking?, pc_id: pc_id} = socket.assigns
 
-    case Utils.atomize(action_param) do
-      ^previous_action ->
-        Components.cancel_action(id, previous_action)
-        {:noreply, assign(socket, action: nil)}
+    if attacking?, do: Components.begin_attack(pc_id, target_id)
 
-      new_action ->
-        Components.begin_action(id, new_action, previous_action)
-        {:noreply, assign(socket, action: new_action)}
+    {:noreply, assign(socket, target_id: target_id)}
+  end
+
+  def handle_event("action", %{"action" => "attack"}, socket) do
+    %{pc_id: id, target_id: target_id} = socket.assigns
+
+    if socket.assigns.attacking? do
+      Components.cancel_attack(id)
+      {:noreply, assign(socket, attacking?: false)}
+    else
+      Components.begin_attack(id, target_id)
+      {:noreply, assign(socket, attacking?: true)}
     end
   end
 
@@ -99,7 +110,7 @@ defmodule ElixirQuestWeb.Game do
     {region_id, x, y} = Location.get(pc_id)
 
     target =
-      case Target.get(pc_id) do
+      case socket.assigns.target_id do
         nil ->
           # PC has no target
           nil
@@ -182,10 +193,10 @@ defmodule ElixirQuestWeb.Game do
     current / max * 100
   end
 
-  defp action_button(button_action, active_action) do
+  defp attack_button(attacking?) do
     base = "w-1/6 border border-black font-bold text-center py-4 my-4 cursor-pointer select-none"
 
-    if active_action == button_action do
+    if attacking? do
       [base, " bg-gray-300"]
     else
       base

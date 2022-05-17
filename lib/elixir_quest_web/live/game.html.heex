@@ -1,6 +1,7 @@
 <div class="h-screen flex-col bg-blue-200 pt-4">
   <div class="flex justify-center align-center h-5/6 text-3xl bg-green-300"
-       phx-window-keydown="move">
+       phx-window-keydown="start_move"
+       phx-window-keyup="stop_move">
     <div class="block w-1/4 relative">
       <%= if @pc_id do %>
         <p class="mb-4"><%= @pc_name %></p>
@@ -50,7 +51,7 @@
   </div>
   <div class="flex justify-center">
     <div id="attack-button"
-         class={action_button(:attack, @action)}
+         class={attack_button(@attacking?)}
          phx-click="action"
          phx-value-action="attack">
       Attack!

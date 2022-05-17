@@ -40,4 +40,10 @@ defmodule ElixirQuest.Components.Respawn do
     |> Ets.wrap_existing!()
     |> Ets.delete!(entity_id)
   end
+
+  def has_component?(entity_id) do
+    __MODULE__
+    |> Ets.wrap_existing!()
+    |> Ets.has_key!(entity_id)
+  end
 end
