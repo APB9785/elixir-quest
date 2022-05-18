@@ -20,6 +20,7 @@ defmodule ElixirQuest.Components do
   alias ElixirQuest.Components.Level
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Components.Moving
+  alias ElixirQuest.Components.MovementSpeed
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.PlayerChar
   alias ElixirQuest.Components.Respawn
@@ -36,6 +37,7 @@ defmodule ElixirQuest.Components do
   @system_frequencies Systems.frequencies()
 
   @pc_image_filename "knight.png"
+  @pc_base_movement_speed 250
   @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000}
 
   def start_link(_) do
@@ -46,26 +48,29 @@ defmodule ElixirQuest.Components do
     Logger.info("Components initialized")
     PubSub.subscribe(EQPubSub, "tick")
 
-    state = %{
-      aggro: Aggro.initialize_table(),
-      attacking: Attacking.initialize_table(),
-      cooldown: Cooldown.initialize_table(),
-      dead: Dead.initialize_table(),
-      equipment: Equipment.initialize_table(),
-      experience: Experience.initialize_table(),
-      health: Health.initialize_table(),
-      image: Image.initialize_table(),
-      level: Level.initialize_table(),
-      location: Location.initialize_table(),
-      movement: Moving.initialize_table(),
-      name: Name.initialize_table(),
-      player_char: PlayerChar.initialize_table(),
-      respawn: Respawn.initialize_table(),
-      seeking: Seeking.initialize_table(),
-      wandering: Wandering.initialize_table()
-    }
+    component_modules = [
+      Aggro,
+      Attacking,
+      Cooldown,
+      Dead,
+      Equipment,
+      Experience,
+      Health,
+      Image,
+      Level,
+      Location,
+      MovementSpeed,
+      Moving,
+      Name,
+      PlayerChar,
+      Respawn,
+      Seeking,
+      Wandering
+    ]
 
-    {:ok, state, {:continue, :load}}
+    Enum.each(component_modules, &apply(&1, :initialize_table, []))
+
+    {:ok, [], {:continue, :load}}
   end
 
   def handle_continue(:load, state) do
@@ -96,6 +101,7 @@ defmodule ElixirQuest.Components do
         Image.add(id, @pc_image_filename)
         Name.add(id, pc.name)
         Equipment.add(id, %{weapon: @weapon_hands_stats})
+        MovementSpeed.add(id, @pc_base_movement_speed)
 
         {:reply, :success, state}
     end

@@ -14,6 +14,7 @@ defmodule ElixirQuest.Systems do
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Level
   alias ElixirQuest.Components.Location
+  alias ElixirQuest.Components.MovementSpeed
   alias ElixirQuest.Components.Moving
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.PlayerChar
@@ -25,7 +26,7 @@ defmodule ElixirQuest.Systems do
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.Utils
 
-  @movement_cooldown 250
+  @mob_seeking_speed 250
 
   Module.register_attribute(__MODULE__, :frequency, accumulate: true)
 
@@ -52,7 +53,8 @@ defmodule ElixirQuest.Systems do
 
         unless Location.occupied?(region_id, destination_x, destination_y) do
           now = NaiveDateTime.utc_now()
-          next_move_time = NaiveDateTime.add(now, @movement_cooldown, :millisecond)
+          movement_cooldown = MovementSpeed.get(entity_id)
+          next_move_time = NaiveDateTime.add(now, movement_cooldown, :millisecond)
           Location.update(entity_id, destination_x, destination_y)
           Cooldown.add(entity_id, :move, next_move_time)
         end
@@ -122,6 +124,7 @@ defmodule ElixirQuest.Systems do
               {pc_id, _x, _y} ->
                 Wandering.remove(mob_id)
                 Seeking.add(mob_id, pc_id)
+                MovementSpeed.update(mob_id, @mob_seeking_speed)
             end
         end
       end

@@ -8,10 +8,14 @@ defmodule ElixirQuest.Mobs do
   alias ElixirQuest.Components.Health
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Location
+  alias ElixirQuest.Components.MovementSpeed
   alias ElixirQuest.Components.Name
   alias ElixirQuest.Components.Wandering
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.Repo
+
+  @default_mob_image_filename "goblin.png"
+  @mob_wandering_speed 1000
 
   def new!(attrs) do
     %Mob{}
@@ -51,7 +55,8 @@ defmodule ElixirQuest.Mobs do
     Health.add(id, mob.max_hp, mob.max_hp)
     Wandering.add(id)
     Aggro.add(id, mob.aggro_range)
-    Image.add(id, "goblin.png")
+    Image.add(id, @default_mob_image_filename)
     Name.add(id, mob.name)
+    MovementSpeed.add(id, @mob_wandering_speed)
   end
 end
