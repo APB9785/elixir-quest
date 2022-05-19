@@ -9,7 +9,7 @@ Frontend uses Phoenix LiveView rendering simple assets.
 
 * [x] Base ECS implementation  
 * [x] Game state rendering w/ LiveView  
-* [/] Simple entity movement  
+* [x] Simple entity movement  
 * [x] Wander, aggro, and seek components for mobs  
 * [/] Attacking  
 * [x] Entity death  
