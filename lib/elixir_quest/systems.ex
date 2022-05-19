@@ -108,27 +108,31 @@ defmodule ElixirQuest.Systems do
 
     Enum.each(aggro_mobs, fn {mob_id, aggro_range} ->
       unless Seeking.has_target?(mob_id) do
-        {mob_region, mob_x, mob_y} = Location.get(mob_id)
-
-        case Map.get(pcs_with_coords_by_region, mob_region) do
-          nil ->
-            # No PCs in this region
-            :noop
-
-          local_pcs ->
-            case Enum.find(local_pcs, &within_aggro_range?(&1, {mob_x, mob_y}, aggro_range)) do
-              nil ->
-                # All PCs are out of range
-                :noop
-
-              {pc_id, _x, _y} ->
-                Wandering.remove(mob_id)
-                Seeking.add(mob_id, pc_id)
-                MovementSpeed.update(mob_id, @mob_seeking_speed)
-            end
-        end
+        look_for_targets(mob_id, aggro_range, pcs_with_coords_by_region)
       end
     end)
+  end
+
+  defp look_for_targets(mob_id, aggro_range, pcs_with_coords_by_region) do
+    {mob_region, mob_x, mob_y} = Location.get(mob_id)
+
+    case Map.get(pcs_with_coords_by_region, mob_region) do
+      nil ->
+        # No PCs in this region
+        :noop
+
+      local_pcs ->
+        case Enum.find(local_pcs, &within_aggro_range?(&1, {mob_x, mob_y}, aggro_range)) do
+          nil ->
+            # All PCs are out of range
+            :noop
+
+          {pc_id, _x, _y} ->
+            Wandering.remove(mob_id)
+            Seeking.add(mob_id, pc_id)
+            MovementSpeed.update(mob_id, @mob_seeking_speed)
+        end
+    end
   end
 
   defp within_aggro_range?({_pc_id, pc_x, pc_y}, {mob_x, mob_y}, aggro_range) do
@@ -167,8 +171,9 @@ defmodule ElixirQuest.Systems do
         !Cooldown.ready?(attacker_id, :attack) ->
           :noop
 
-        Respawn.has_component?(target_id) or Dead.has_component?(target_id) ->
+        target_already_dead?(target_id) ->
           unless PlayerChar.has_component?(attacker_id) do
+            # Mobs should go back to wandering
             Seeking.remove(attacker_id)
             Wandering.add(attacker_id)
           end
@@ -176,21 +181,41 @@ defmodule ElixirQuest.Systems do
           Attacking.remove(attacker_id)
 
         :otherwise ->
-          %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd}} = Equipment.get(attacker_id)
-
-          next_attack = NaiveDateTime.utc_now() |> NaiveDateTime.add(weapon_cd, :millisecond)
-          Cooldown.add(attacker_id, :attack, next_attack)
-
-          attacker_id
-          |> Logs.from_attack(target_id, weapon_dmg)
-          |> Logs.broadcast()
-
-          new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
-
-          if new_hp <= 0, do: Dead.add(target_id)
+          attempt_attack(attacker_id, target_id)
       end
     end)
   end
+
+  defp target_already_dead?(target_id) do
+    Respawn.has_component?(target_id) or Dead.has_component?(target_id)
+  end
+
+  defp attempt_attack(attacker_id, target_id) do
+    attacker_location = Location.get(attacker_id)
+    target_location = Location.get(target_id)
+
+    %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd, range: weapon_range}} =
+      Equipment.get(attacker_id)
+
+    if within_range?(attacker_location, target_location, weapon_range) do
+      next_attack = NaiveDateTime.utc_now() |> NaiveDateTime.add(weapon_cd, :millisecond)
+      Cooldown.add(attacker_id, :attack, next_attack)
+
+      attacker_id
+      |> Logs.from_attack(target_id, weapon_dmg)
+      |> Logs.broadcast()
+
+      new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
+
+      if new_hp <= 0, do: Dead.add(target_id)
+    end
+  end
+
+  defp within_range?({region, attacker_x, attacker_y}, {region, target_x, target_y}, range) do
+    Utils.distance({attacker_x, attacker_y}, {target_x, target_y}) < range
+  end
+
+  defp within_range?(_, _, _), do: false
 
   @frequency {:backup_state, 250}
   def backup_state do

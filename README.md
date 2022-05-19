@@ -11,7 +11,7 @@ Frontend uses Phoenix LiveView rendering simple assets.
 * [x] Game state rendering w/ LiveView  
 * [x] Simple entity movement  
 * [x] Wander, aggro, and seek components for mobs  
-* [/] Attacking  
+* [x] Attacking  
 * [x] Entity death  
 * [x] Entity respawns  
 * [ ] Other actions  

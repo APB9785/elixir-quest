@@ -38,7 +38,7 @@ defmodule ElixirQuest.Components do
 
   @pc_image_filename "knight.png"
   @pc_base_movement_speed 250
-  @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000}
+  @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000, range: 1.9}
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
