@@ -14,9 +14,14 @@ Frontend uses Phoenix LiveView rendering simple assets.
 * [x] Attacking  
 * [x] Entity death  
 * [x] Entity respawns  
-* [ ] Other actions  
 * [x] Action logs  
 * [x] Game state persistence (postgres)  
 * [ ] Player accounts  
+* [ ] Gold from defeating mobs  
+* [ ] Experience/leveling from defeating mobs  
+* [ ] Inventory/items/equipment  
+* [ ] Entity stats/attributes  
+* [ ] Other actions  
+* [ ] Player death/respawning  
 * [ ] Player Chat  
 * [ ] More robust UI, possibly canvas  
