@@ -16,6 +16,7 @@ Frontend uses Phoenix LiveView rendering simple assets.
 * [x] Entity respawns  
 * [x] Action logs  
 * [x] Game state persistence (postgres)  
+* [x] Send clients relevant component updates via PubSub  
 * [ ] Player accounts  
 * [ ] Gold from defeating mobs  
 * [ ] Experience/leveling from defeating mobs  

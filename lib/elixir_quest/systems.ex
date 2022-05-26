@@ -55,7 +55,7 @@ defmodule ElixirQuest.Systems do
           now = NaiveDateTime.utc_now()
           movement_cooldown = MovementSpeed.get(entity_id)
           next_move_time = NaiveDateTime.add(now, movement_cooldown, :millisecond)
-          Location.update(entity_id, destination_x, destination_y)
+          Location.update(entity_id, region_id, {destination_x, destination_y}, {x, y})
           Cooldown.add(entity_id, :move, next_move_time)
         end
       end
@@ -157,6 +157,8 @@ defmodule ElixirQuest.Systems do
       Name.remove(id)
       Dead.remove(id)
       Moving.remove(id)
+
+      Phoenix.PubSub.broadcast(EQPubSub, "entity:#{id}", {:death, id})
 
       Respawn.add(id)
     end)

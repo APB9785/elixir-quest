@@ -21,23 +21,37 @@ defmodule ElixirQuestWeb.Game do
     socket =
       if connected?(socket) do
         # Temporary lookup until accounts are setup (then id will be read from accounts table)
-        %PC{id: id, name: name} = pc = PlayerChars.get_by_name("dude")
+        pc = PlayerChars.get_by_name("dude")
+        coords = {pc.x_pos, pc.y_pos}
 
         spawn_pc(pc)
 
         # Register for the PubSub to receive server ticks and action logs.
-        PubSub.subscribe(EQPubSub, "tick")
         PubSub.subscribe(EQPubSub, "logs")
+        PubSub.subscribe(EQPubSub, "region:#{pc.region_id}")
+        PubSub.subscribe(EQPubSub, "entity:#{pc.id}")
+
+        region_map = map_region(pc.region_id)
 
         assign(socket,
-          pc_id: id,
-          pc_name: name,
+          pc_id: pc.id,
+          pc_name: pc.name,
+          location: coords,
+          region_map: region_map,
           current_hp: pc.current_hp,
           max_hp: pc.max_hp,
-          logs: [Logs.from_spawn(name)]
+          logs: [Logs.from_spawn(pc.name)]
         )
       else
-        assign(socket, pc_id: nil, pc_name: nil, current_hp: nil, max_hp: nil, logs: [])
+        assign(socket,
+          pc_id: nil,
+          pc_name: nil,
+          location: nil,
+          region_map: nil,
+          current_hp: nil,
+          max_hp: nil,
+          logs: []
+        )
       end
 
     {:ok,
@@ -45,7 +59,9 @@ defmodule ElixirQuestWeb.Game do
        cells: nil,
        target_id: nil,
        move_direction: nil,
-       target: nil,
+       target_hp: nil,
+       target_max_hp: nil,
+       target_name: nil,
        attacking?: false
      ), temporary_assigns: [logs: []]}
   end
@@ -84,12 +100,27 @@ defmodule ElixirQuestWeb.Game do
     end
   end
 
+  def handle_event("target", %{"id" => nil}, socket) do
+    Components.cancel_attack(socket.assigns.pc_id)
+
+    {:noreply, remove_target(socket)}
+  end
+
   def handle_event("target", %{"id" => target_id}, socket) do
     %{attacking?: attacking?, pc_id: pc_id} = socket.assigns
 
+    PubSub.subscribe(EQPubSub, "entity:#{target_id}")
+    {current_hp, max_hp} = Health.get(target_id)
+
     if attacking?, do: Components.begin_attack(pc_id, target_id)
 
-    {:noreply, assign(socket, target_id: target_id)}
+    {:noreply,
+     assign(socket,
+       target_id: target_id,
+       target_hp: current_hp,
+       target_max_hp: max_hp,
+       target_name: Name.get(target_id)
+     )}
   end
 
   def handle_event("action", %{"action" => "attack"}, socket) do
@@ -104,48 +135,63 @@ defmodule ElixirQuestWeb.Game do
     end
   end
 
-  def handle_info({:tick, _tick}, %{assigns: %{pc_id: pc_id}} = socket) do
-    # TODO: framerate reduction option?
-    {current_hp, max_hp} = Health.get(pc_id)
-    {region_id, x, y} = Location.get(pc_id)
+  def handle_info({:moved, entity_id, location, prev}, socket) do
+    {{^entity_id, image}, new_region_map} = Map.pop(socket.assigns.region_map, prev)
 
-    target =
-      case socket.assigns.target_id do
-        nil ->
-          # PC has no target
-          nil
+    final_region_map = Map.put(new_region_map, location, {entity_id, image})
 
-        target_id ->
-          case Health.get(target_id) do
-            nil ->
-              # No health means this is probably region boundary entity
-              nil
-
-            {current, max} ->
-              # Valid target
-              %{
-                current_hp: current,
-                max_hp: max,
-                name: Name.get(target_id)
-              }
-          end
+    socket =
+      if socket.assigns.pc_id == entity_id do
+        assign(socket, coords: location)
+      else
+        socket
       end
 
-    fresh_cells =
-      {x, y}
-      |> Utils.calculate_nearby_coords()
-      |> Enum.map(fn {x, y} -> Location.search(region_id, x, y) end)
+    {:noreply, assign(socket, region_map: final_region_map)}
+  end
 
-    {:noreply,
-     assign(socket, cells: fresh_cells, current_hp: current_hp, max_hp: max_hp, target: target)}
+  def handle_info({:removed, _entity_id, location}, socket) do
+    new_region_map = Map.delete(socket.assigns.region_map, location)
+
+    {:noreply, assign(socket, region_map: new_region_map)}
+  end
+
+  def handle_info({:hp_change, entity_id, new_hp}, socket) do
+    %{pc_id: pc_id, target_id: target_id} = socket.assigns
+
+    case entity_id do
+      ^pc_id -> {:noreply, assign(socket, current_hp: new_hp)}
+      ^target_id -> {:noreply, assign(socket, target_hp: new_hp)}
+    end
+  end
+
+  def handle_info({:max_hp_change, entity_id, new_max_hp}, socket) do
+    %{pc_id: pc_id, target_id: target_id} = socket.assigns
+
+    case entity_id do
+      ^pc_id -> {:noreply, assign(socket, current_max_hp: new_max_hp)}
+      ^target_id -> {:noreply, assign(socket, target_max_hp: new_max_hp)}
+    end
+  end
+
+  def handle_info({:death, entity_id}, socket) do
+    socket =
+      if entity_id == socket.assigns.target_id do
+        remove_target(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info({:log_entry, entry}, socket) do
     {:noreply, assign(socket, logs: [entry])}
   end
 
-  def handle_info(:move_cooled, socket) do
-    {:noreply, assign(socket, move_cooldown: false)}
+  defp remove_target(socket) do
+    PubSub.unsubscribe(EQPubSub, "entity:#{socket.assigns.target_id}")
+    assign(socket, target_id: nil, target_hp: nil, target_max_hp: nil, target_name: nil)
   end
 
   defp spawn_pc(%PC{id: id} = pc) do
@@ -162,30 +208,43 @@ defmodule ElixirQuestWeb.Game do
     end
   end
 
-  defp render_cell(nil), do: render_cell("background.png", nil)
-
-  defp render_cell(content_id) do
-    # This is kinda hack-y, and is only here to prevent setting the target to a boundary or
-    # to your own character and then trying to do something that doesn't work,
-    # such as attacking it.
-    # TODO: find a better way to prevent targetting boundaries/self.
-    case Image.get(content_id) do
-      filename when filename in ~w(rock_mount.png knight.png) ->
-        render_cell(filename, nil)
-
-      other_filename ->
-        render_cell(other_filename, content_id)
-    end
+  defp nearby_cells(region_map, pc_location) do
+    pc_location
+    |> Utils.calculate_nearby_coords()
+    |> Enum.map(&Map.get(region_map, &1, {nil, "background.png"}))
   end
 
-  defp render_cell(image_filename, id) do
+  defp map_region(region_id) do
+    region_id
+    |> Location.get_all_from_region()
+    |> Task.async_stream(&get_image/1, ordered: false)
+    |> Enum.reduce(%{}, fn {:ok, {x, y, entity_id, image}}, acc ->
+      Map.put(acc, {x, y}, {entity_id, image})
+    end)
+  end
+
+  defp get_image({entity_id, _region_id, x, y}) do
+    {x, y, entity_id, Image.get(entity_id)}
+  end
+
+  # This is kinda hack-y, and is only here to prevent setting the target to a boundary or
+  # to your own character and then trying to do something that doesn't work,
+  # such as attacking it.
+  # TODO: find a better way to prevent targetting boundaries/self.
+  defp render_cell({_entity_id, image_filename})
+       when image_filename in ~w(rock_mount.png knight.png),
+       do: render_cell(nil, image_filename)
+
+  defp render_cell({entity_id, image_filename}), do: render_cell(entity_id, image_filename)
+
+  defp render_cell(entity_id, image_filename) do
     path = Path.join("/images", image_filename)
 
     ElixirQuestWeb.Endpoint
     |> Routes.static_path(path)
     |> img_tag(
       class: "object-scale-down min-w-0 min-h-0 h-fit max-w-full max-h-full",
-      phx_click: JS.push("target", value: %{id: id})
+      phx_click: JS.push("target", value: %{id: entity_id})
     )
   end
 

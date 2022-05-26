@@ -4,6 +4,7 @@ defmodule ElixirQuest.Components.Location do
   with the id of its region and the x/y coordinates where it are currently located.
   """
   alias ETS.Set, as: Ets
+  alias Phoenix.PubSub
 
   def initialize_table, do: Ets.new!(name: __MODULE__)
 
@@ -22,28 +23,32 @@ defmodule ElixirQuest.Components.Location do
     end
   end
 
+  def get_all_from_region(region_id) do
+    __MODULE__
+    |> Ets.wrap_existing!()
+    |> Ets.match_object!({:_, region_id, :_, :_})
+  end
+
   def remove(entity_id) do
+    {region_id, x, y} = get(entity_id)
+
     __MODULE__
     |> Ets.wrap_existing!()
     |> Ets.delete!(entity_id)
+
+    PubSub.broadcast(EQPubSub, "region:#{region_id}", {:removed, entity_id, {x, y}})
   end
 
   @doc """
-  Updates the location of an entity to a given coordinate.  Region is unchanged.
+  Updates the location of an entity to a given coordinate.
+  `region_id` is for broadcasting only and will not update the entity's region.
   """
-  def update(entity_id, x, y) do
+  def update(entity_id, region_id, {x, y}, previous) do
     __MODULE__
     |> Ets.wrap_existing!()
     |> Ets.update_element!(entity_id, [{3, x}, {4, y}])
-  end
 
-  @doc """
-  Updates the location of an entity to a given region and coordinate.
-  """
-  def update(entity_id, region_id, x, y) do
-    __MODULE__
-    |> Ets.wrap_existing!()
-    |> Ets.update_element!(entity_id, [{2, region_id}, {3, x}, {4, y}])
+    PubSub.broadcast(EQPubSub, "region:#{region_id}", {:moved, entity_id, {x, y}, previous})
   end
 
   @doc """

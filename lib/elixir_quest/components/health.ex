@@ -37,6 +37,7 @@ defmodule ElixirQuest.Components.Health do
     new_hp = current_hp - amount
 
     Ets.update_element!(table, entity_id, {2, new_hp})
+    Phoenix.PubSub.broadcast(EQPubSub, "entity:#{entity_id}", {:hp_change, entity_id, new_hp})
 
     new_hp
   end

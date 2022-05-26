@@ -13,12 +13,12 @@
             </div>
         </div>
       <% end %>
-      <%= if @target do %>
-        <p class="mb-4"><%= @target.name %></p>
+      <%= if @target_id do %>
+        <p class="mb-4"><%= @target_name %></p>
         <div class="w-1/2 h-6 bg-gray-600 rounded-md">
-            <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@target.current_hp, @target.max_hp)}%;"}>
+            <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@target_hp, @target_max_hp)}%;"}>
               <div class="text-sm center">
-                <%= @target.current_hp %> / <%= @target.max_hp %>
+                <%= @target_hp %> / <%= @target_max_hp %>
               </div>
             </div>
         </div>
@@ -35,10 +35,10 @@
       </div>
     </div>
 
-    <%= if @cells do %>
+    <%= if @region_map do %>
       <div class="block">
         <div class="h-full grid grid-cols-11 gap-0">
-          <%= for cell <- @cells do %>
+          <%= for cell <- nearby_cells(@region_map, @location) do %>
             <%= render_cell(cell) %>
           <% end %>
         </div>

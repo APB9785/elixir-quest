@@ -1,10 +1,12 @@
 defmodule ElixirQuest.Components.Name do
   @moduledoc """
   All entities which can be targeted should have a Name component with the name to be displayed.
+
+  Images currently don't change so this table's traffic is almost 100% reads.
   """
   alias ETS.Set, as: Ets
 
-  def initialize_table, do: Ets.new!(name: __MODULE__)
+  def initialize_table, do: Ets.new!(name: __MODULE__, read_concurrency: true)
 
   def add(entity_id, name) do
     __MODULE__
