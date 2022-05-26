@@ -142,12 +142,19 @@ defmodule ElixirQuestWeb.Game do
 
     socket =
       if socket.assigns.pc_id == entity_id do
-        assign(socket, coords: location)
+        assign(socket, location: location)
       else
         socket
       end
 
     {:noreply, assign(socket, region_map: final_region_map)}
+  end
+
+  def handle_info({:spawned, entity_id, location}, socket) do
+    image = Image.get(entity_id)
+    new_region_map = Map.put(socket.assigns.region_map, location, {entity_id, image})
+
+    {:noreply, assign(socket, region_map: new_region_map)}
   end
 
   def handle_info({:removed, _entity_id, location}, socket) do

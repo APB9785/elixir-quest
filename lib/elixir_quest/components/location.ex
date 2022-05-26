@@ -8,10 +8,12 @@ defmodule ElixirQuest.Components.Location do
 
   def initialize_table, do: Ets.new!(name: __MODULE__)
 
-  def add(entity_id, region, x_pos, y_pos) do
+  def add(entity_id, region_id, x, y) do
     __MODULE__
     |> Ets.wrap_existing!()
-    |> Ets.put!({entity_id, region, x_pos, y_pos})
+    |> Ets.put!({entity_id, region_id, x, y})
+
+    PubSub.broadcast(EQPubSub, "region:#{region_id}", {:spawned, entity_id, {x, y}})
   end
 
   def get(entity_id) do
