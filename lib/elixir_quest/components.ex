@@ -26,6 +26,7 @@ defmodule ElixirQuest.Components do
   alias ElixirQuest.Components.Respawn
   alias ElixirQuest.Components.Seeking
   alias ElixirQuest.Components.Wandering
+  alias ElixirQuest.Logs
   alias ElixirQuest.Mobs
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
@@ -102,6 +103,9 @@ defmodule ElixirQuest.Components do
         Name.add(id, pc.name)
         Equipment.add(id, %{weapon: @weapon_hands_stats})
         MovementSpeed.add(id, @pc_base_movement_speed)
+
+        log_entry = Logs.from_spawn(pc.name)
+        PubSub.broadcast(EQPubSub, "region:#{pc.region_id}", {:log_entry, log_entry})
 
         {:reply, :success, state}
     end

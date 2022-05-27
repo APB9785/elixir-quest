@@ -70,11 +70,11 @@
 }
 
 .phx-modal-content {
-  background-color: #fefefe;
+  background-color: #d3d3d3;
   margin: 15vh auto;
   padding: 20px;
-  border: 1px solid #888;
-  width: 80%;
+  border: 2px solid rgb(0 0 0);
+  width: 40%;
 }
 
 .phx-modal-close {
@@ -90,4 +90,3 @@
   text-decoration: none;
   cursor: pointer;
 }
-

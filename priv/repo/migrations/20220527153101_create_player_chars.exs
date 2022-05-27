@@ -11,6 +11,9 @@ defmodule ElixirQuest.Repo.Migrations.CreatePlayerChars do
       add :x_pos, :integer
       add :y_pos, :integer
       add :region_id, references("regions", type: :binary_id)
+      add :account_id, references("accounts", type: :binary_id)
     end
+
+    create index(:player_chars, [:account_id])
   end
 end

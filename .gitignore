@@ -38,3 +38,6 @@ npm-debug.log
 .DS_Store
 
 .tool-versions
+
+# Do not include sensitive config
+.envrc

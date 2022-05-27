@@ -1,7 +1,7 @@
 # Script for populating the database. You can run it as: `mix run priv/repo/seeds.exs`
 
+alias ElixirQuest.Accounts
 alias ElixirQuest.Mobs
-alias ElixirQuest.PlayerChars
 alias ElixirQuest.Regions
 
 # REGIONS
@@ -37,17 +37,11 @@ Enum.each(cave_goblins, fn attrs ->
   |> Mobs.new!()
 end)
 
-# PLAYER CHARACTER
+# ACCOUNTS
 
-pc_attrs = %{
-  name: "dude",
-  region_id: cave.id,
-  level: 1,
-  experience: 0,
-  max_hp: 12,
-  current_hp: 12,
-  x_pos: 6,
-  y_pos: 6
+account_attrs = %{
+  email: "test@elixir.quest",
+  password: "testtest"
 }
 
-PlayerChars.new!(pc_attrs)
+Accounts.register_account(account_attrs)

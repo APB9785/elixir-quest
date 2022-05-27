@@ -2,6 +2,8 @@ defmodule ElixirQuest.Regions do
   @moduledoc """
   Functions for working with Regions.
   """
+  import Ecto.Query
+
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Regions.Region
@@ -15,6 +17,10 @@ defmodule ElixirQuest.Regions do
 
   def load_all do
     Repo.all(Region)
+  end
+
+  def get_spawn_region_id do
+    Repo.one(from r in Region, where: r.name == "cave", select: r.id)
   end
 
   # This will read the raw_map of a region and add components for the boundary entities.

@@ -1,0 +1,26 @@
+<div class="phx-modal">
+  <div class="phx-modal-content relative grid justify-items-center bg-grey-500 rounded-xl">
+
+    <div phx-click="cancel_create_pc" class="absolute text-lg top-0 right-2 cursor-pointer">
+      &times;
+    </div>
+
+    <div class="flex w-full my-12">
+      <.form let={f} for={@changeset} id="create-new-pc-form" class="grid w-full justify-center"
+        phx_target={@myself} phx_submit="create_new_pc" phx_change="validate">
+
+        <%= text_input f, :name, placeholder: "Name",
+              phx_debounce: "blur", autocomplete: "off",
+              class: name_field() %>
+        <div class="pl-6 pt-4">
+          <%= error_tag f, :name %>
+        </div>
+
+        <%= submit "Create New Character", phx_disable_with: "Creating...",
+              class: "py-1 border-2 border-black bg-orange-300 rounded-xl" %>
+
+      </.form>
+    </div>
+
+  </div>
+</div>

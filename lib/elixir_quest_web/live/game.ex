@@ -4,12 +4,12 @@ defmodule ElixirQuestWeb.Game do
   """
   use ElixirQuestWeb, :live_view
 
+  alias ElixirQuest.Accounts
   alias ElixirQuest.Components
   alias ElixirQuest.Components.Health
   alias ElixirQuest.Components.Image
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Components.Name
-  alias ElixirQuest.Logs
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Utils
@@ -17,53 +17,69 @@ defmodule ElixirQuestWeb.Game do
   alias Phoenix.LiveView.JS
   alias Phoenix.PubSub
 
-  def mount(_, _, socket) do
+  def mount(_params, session, socket) do
     socket =
-      if connected?(socket) do
-        # Temporary lookup until accounts are setup (then id will be read from accounts table)
-        pc = PlayerChars.get_by_name("dude")
-        coords = {pc.x_pos, pc.y_pos}
+      case Accounts.get_account_by_session_token(session["account_token"]) do
+        nil ->
+          # Player is logged out
+          # Do logged-out stuff.
+          assign(socket, account: nil, account_pc: nil)
 
-        spawn_pc(pc)
-
-        # Register for the PubSub to receive server ticks and action logs.
-        PubSub.subscribe(EQPubSub, "logs")
-        PubSub.subscribe(EQPubSub, "region:#{pc.region_id}")
-        PubSub.subscribe(EQPubSub, "entity:#{pc.id}")
-
-        region_map = map_region(pc.region_id)
-
-        assign(socket,
-          pc_id: pc.id,
-          pc_name: pc.name,
-          location: coords,
-          region_map: region_map,
-          current_hp: pc.current_hp,
-          max_hp: pc.max_hp,
-          logs: [Logs.from_spawn(pc.name)]
-        )
-      else
-        assign(socket,
-          pc_id: nil,
-          pc_name: nil,
-          location: nil,
-          region_map: nil,
-          current_hp: nil,
-          max_hp: nil,
-          logs: []
-        )
+        account ->
+          # Player is logged in
+          pc = PlayerChars.get_by_account(account)
+          assign(socket, account: account, account_pc: pc)
       end
 
     {:ok,
      assign(socket,
-       cells: nil,
+       pc_id: nil,
+       pc_name: nil,
+       location: nil,
+       region_map: nil,
+       current_hp: nil,
+       max_hp: nil,
+       logs: [],
        target_id: nil,
        move_direction: nil,
        target_hp: nil,
        target_max_hp: nil,
        target_name: nil,
-       attacking?: false
+       attacking?: false,
+       create_new_pc: false
      ), temporary_assigns: [logs: []]}
+  end
+
+  def handle_event("load_all", _params, socket) do
+    %PC{
+      id: pc_id,
+      name: pc_name,
+      x_pos: x,
+      y_pos: y,
+      current_hp: current_hp,
+      max_hp: max_hp,
+      region_id: region_id
+    } = pc = socket.assigns.account_pc
+
+    # Register for the PubSub to receive server ticks and action logs.
+    PubSub.subscribe(EQPubSub, "logs")
+    PubSub.subscribe(EQPubSub, "region:#{region_id}")
+    PubSub.subscribe(EQPubSub, "entity:#{pc_id}")
+
+    region_map = map_region(region_id)
+
+    spawn_pc(pc)
+
+    {:noreply,
+     assign(socket,
+       account_pc: nil,
+       pc_id: pc_id,
+       pc_name: pc_name,
+       location: {x, y},
+       current_hp: current_hp,
+       max_hp: max_hp,
+       region_map: region_map
+     )}
   end
 
   def handle_event("start_move", %{"key" => key}, socket) do
@@ -135,6 +151,14 @@ defmodule ElixirQuestWeb.Game do
     end
   end
 
+  def handle_event("create_new_pc", _, socket) do
+    {:noreply, assign(socket, create_new_pc: true)}
+  end
+
+  def handle_event("cancel_create_pc", _, socket) do
+    {:noreply, assign(socket, create_new_pc: false)}
+  end
+
   def handle_info({:moved, entity_id, location, prev}, socket) do
     {{^entity_id, image}, new_region_map} = Map.pop(socket.assigns.region_map, prev)
 
@@ -194,6 +218,14 @@ defmodule ElixirQuestWeb.Game do
 
   def handle_info({:log_entry, entry}, socket) do
     {:noreply, assign(socket, logs: [entry])}
+  end
+
+  def handle_info(:new_pc_created, socket) do
+    {:noreply,
+     assign(socket,
+       account_pc: PlayerChars.get_by_account(socket.assigns.account),
+       create_new_pc: false
+     )}
   end
 
   defp remove_target(socket) do

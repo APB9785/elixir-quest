@@ -20,6 +20,11 @@ config :elixir_quest, ElixirQuestWeb.Endpoint,
 # Configures the repo
 config :elixir_quest, ElixirQuest.Repo, migration_primary_key: [type: :binary_id]
 
+# Configures the mailer
+config :elixir_quest, ElixirQuest.Mailer,
+  adapter: Swoosh.Adapters.Postmark,
+  api_key: {:system, "POSTMARK_API_KEY"}
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.12.18",

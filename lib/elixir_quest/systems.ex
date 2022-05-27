@@ -228,7 +228,6 @@ defmodule ElixirQuest.Systems do
       {region, x, y} = Location.get(pc_id)
 
       attrs = %{
-        name: Name.get(pc_id),
         level: Level.get(pc_id),
         experience: Experience.get(pc_id),
         max_hp: max_hp,

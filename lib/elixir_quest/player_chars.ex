@@ -4,30 +4,56 @@ defmodule ElixirQuest.PlayerChars do
   """
   import Ecto.Query
 
+  alias ElixirQuest.Accounts.Account
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
+  alias ElixirQuest.Regions
   alias ElixirQuest.Repo
 
-  require Logger
+  def create_new(attrs) do
+    default_attrs = base_attrs()
 
-  def new!(attrs) do
+    full_attrs = Map.merge(default_attrs, attrs)
+
     %PC{}
-    |> PC.changeset(attrs)
-    |> Repo.insert!()
+    |> change_pc_registration(full_attrs)
+    |> Repo.insert()
   end
 
-  # Temporary lookup until accounts are setup (then id will be read from accounts table)
-  def get_by_name(name) do
-    Repo.one(
-      from PC,
-        where: [name: ^name]
-    )
+  def get_by_account(%Account{id: account_id}) do
+    query = from PC, where: [account_id: ^account_id]
+
+    case Repo.all(query) do
+      [] -> nil
+      [pc] -> pc
+    end
   end
 
   def load!(id), do: Repo.get!(PC, id)
 
   def save(pc_id, attrs) do
-    %PC{id: pc_id}
-    |> PC.changeset(attrs)
+    PC
+    |> Repo.get(pc_id)
+    |> change_pc_backup(attrs)
     |> Repo.update!()
+  end
+
+  def change_pc_registration(%PC{} = pc, attrs \\ %{}) do
+    PC.registration_changeset(pc, attrs)
+  end
+
+  def change_pc_backup(%PC{} = pc, attrs \\ %{}) do
+    PC.backup_changeset(pc, attrs)
+  end
+
+  def base_attrs do
+    %{
+      region_id: Regions.get_spawn_region_id(),
+      level: 1,
+      experience: 0,
+      max_hp: 12,
+      current_hp: 12,
+      x_pos: 6,
+      y_pos: 6
+    }
   end
 end

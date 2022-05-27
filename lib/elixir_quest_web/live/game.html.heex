@@ -1,60 +1,108 @@
 <div class="h-screen flex-col bg-blue-200 pt-4">
-  <div class="flex justify-center align-center h-5/6 text-3xl bg-green-300"
-       phx-window-keydown="start_move"
-       phx-window-keyup="stop_move">
-    <div class="block w-1/4 relative">
-      <%= if @pc_id do %>
-        <p class="mb-4"><%= @pc_name %></p>
-        <div class="w-1/2 h-6 bg-gray-600 rounded-md">
-            <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@current_hp, @max_hp)}%;"}>
-              <div class="text-sm center">
-                <%= @current_hp %> / <%= @max_hp %>
+
+  <%= if @create_new_pc do %>
+    <.live_component module={ElixirQuestWeb.CreateNewPc}
+      id="create-new-pc-modal"
+      account_id={@account.id} />
+  <% end %>
+
+  <%= cond do %>
+
+    <% @account && @pc_id -> %>
+
+      <div class="flex justify-center align-center h-5/6 text-3xl bg-green-300"
+           phx-window-keydown="start_move"
+           phx-window-keyup="stop_move">
+        <div class="block w-1/4 relative">
+
+          <p class="mb-4"><%= @pc_name %></p>
+          <div class="w-1/2 h-6 bg-gray-600 rounded-md">
+              <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@current_hp, @max_hp)}%;"}>
+                <div class="text-sm center">
+                  <%= @current_hp %> / <%= @max_hp %>
+                </div>
               </div>
+          </div>
+
+          <%= if @target_id do %>
+            <p class="mb-4"><%= @target_name %></p>
+            <div class="w-1/2 h-6 bg-gray-600 rounded-md">
+                <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@target_hp, @target_max_hp)}%;"}>
+                  <div class="text-sm center">
+                    <%= @target_hp %> / <%= @target_max_hp %>
+                  </div>
+                </div>
             </div>
-        </div>
-      <% end %>
-      <%= if @target_id do %>
-        <p class="mb-4"><%= @target_name %></p>
-        <div class="w-1/2 h-6 bg-gray-600 rounded-md">
-            <div class="bg-red-500 rounded-md h-6" style={"width: #{hp_percent(@target_hp, @target_max_hp)}%;"}>
-              <div class="text-sm center">
-                <%= @target_hp %> / <%= @target_max_hp %>
+          <% end %>
+
+          <div id="log-display"
+               class="border-black py-2 border text-base absolute inset-x-0 bottom-0 h-1/3 overflow-y-auto"
+               phx-update="append"
+               phx-hook="LogScroll">
+            <%= for entry <- @logs do %>
+              <div id={"log-#{entry.id}"}>
+                <%= entry.message %>
               </div>
-            </div>
+            <% end %>
+          </div>
+
         </div>
-      <% end %>
-      <div id="log-display"
-           class="border-black py-2 border text-base absolute inset-x-0 bottom-0 h-1/3 overflow-y-auto"
-           phx-update="append"
-           phx-hook="LogScroll">
-        <%= for entry <- @logs do %>
-          <div id={"log-#{entry.id}"}>
-            <%= entry.message %>
+
+        <%= if @region_map do %>
+          <div class="block">
+            <div class="h-full grid grid-cols-11 gap-0">
+              <%= for cell <- nearby_cells(@region_map, @location) do %>
+                <%= render_cell(cell) %>
+              <% end %>
+            </div>
+          </div>
+        <% else %>
+          <div>
+            Loading...
           </div>
         <% end %>
-      </div>
-    </div>
 
-    <%= if @region_map do %>
-      <div class="block">
-        <div class="h-full grid grid-cols-11 gap-0">
-          <%= for cell <- nearby_cells(@region_map, @location) do %>
-            <%= render_cell(cell) %>
-          <% end %>
+      </div>
+
+      <div class="flex justify-center">
+        <div id="attack-button"
+             class={attack_button(@attacking?)}
+             phx-click="action"
+             phx-value-action="attack">
+          Attack!
         </div>
       </div>
-    <% else %>
-      <div>
-        Loading...
+
+    <% @account && @account_pc -> %>
+
+      <div class="grid justify-items-center">
+        <div class="text-center text-xl bg-gray-300 border-2 border-black rounded-xl w-1/2 py-4">
+          <p class="mb-4">Found character:</p>
+          <%= @account_pc.name %> - Level <%= @account_pc.level %>
+        </div>
+        <button phx-click="load_all" class="border border-black rounded-xl mt-6 py-2 w-1/6 align-center bg-white">
+          Spawn
+        </button>
       </div>
-    <% end %>
-  </div>
-  <div class="flex justify-center">
-    <div id="attack-button"
-         class={attack_button(@attacking?)}
-         phx-click="action"
-         phx-value-action="attack">
-      Attack!
-    </div>
-  </div>
+
+    <% @account -> %>
+
+      <div class="grid justify-items-center">
+        <p class="text-center text-xl">
+          No existing characters for your account!
+        </p>
+        <button phx-click="create_new_pc" class="border border-black rounded-xl mt-6 py-2 w-1/6 align-center bg-white">
+          Create character
+        </button>
+      </div>
+
+    <% :otherwise -> %>
+
+      <div>
+        Please <%= link "Log in", to: Routes.account_session_path(@socket, :new) %>
+        or <%= link "Sign up", to: Routes.account_registration_path(@socket, :new) %>
+      </div>
+
+  <% end %>
+
 </div>
