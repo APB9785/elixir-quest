@@ -36,6 +36,7 @@ defmodule ElixirQuestWeb.Game do
        pc_id: nil,
        pc_name: nil,
        location: nil,
+       region_id: nil,
        region_map: nil,
        current_hp: nil,
        max_hp: nil,
@@ -46,7 +47,8 @@ defmodule ElixirQuestWeb.Game do
        target_max_hp: nil,
        target_name: nil,
        attacking?: false,
-       create_new_pc: false
+       create_new_pc: false,
+       escape_menu: false
      ), temporary_assigns: [logs: []]}
   end
 
@@ -78,11 +80,16 @@ defmodule ElixirQuestWeb.Game do
        location: {x, y},
        current_hp: current_hp,
        max_hp: max_hp,
+       region_id: region_id,
        region_map: region_map
      )}
   end
 
-  def handle_event("start_move", %{"key" => key}, socket) do
+  def handle_event("key_down", %{"key" => "Escape"}, socket) do
+    {:noreply, assign(socket, escape_menu: true)}
+  end
+
+  def handle_event("key_down", %{"key" => key}, socket) do
     %{pc_id: pc_id, move_direction: current_direction} = socket.assigns
 
     parsed_input = Utils.parse_direction(key)
@@ -97,7 +104,7 @@ defmodule ElixirQuestWeb.Game do
     end
   end
 
-  def handle_event("stop_move", %{"key" => key}, socket) do
+  def handle_event("key_up", %{"key" => key}, socket) do
     %{pc_id: pc_id, move_direction: current_direction} = socket.assigns
 
     parsed_input = Utils.parse_direction(key)
@@ -159,6 +166,25 @@ defmodule ElixirQuestWeb.Game do
     {:noreply, assign(socket, create_new_pc: false)}
   end
 
+  def handle_event("close_escape_menu", _, socket) do
+    {:noreply, assign(socket, escape_menu: false)}
+  end
+
+  def handle_event("log_out", _, socket) do
+    %{region_id: region_id, pc_id: pc_id, account: account} = socket.assigns
+
+    PubSub.unsubscribe(EQPubSub, "logs")
+    PubSub.unsubscribe(EQPubSub, "region:#{region_id}")
+    PubSub.unsubscribe(EQPubSub, "entity:#{pc_id}")
+
+    PlayerChars.log_out(pc_id)
+
+    socket = unload_pc_assigns(socket)
+
+    {:noreply,
+     assign(socket, escape_menu: false, account_pc: PlayerChars.get_by_account(account))}
+  end
+
   def handle_info({:moved, entity_id, location, prev}, socket) do
     {{^entity_id, image}, new_region_map} = Map.pop(socket.assigns.region_map, prev)
 
@@ -217,6 +243,7 @@ defmodule ElixirQuestWeb.Game do
   end
 
   def handle_info({:log_entry, entry}, socket) do
+    IO.inspect("log received")
     {:noreply, assign(socket, logs: [entry])}
   end
 
@@ -245,6 +272,18 @@ defmodule ElixirQuestWeb.Game do
       :already_spawned ->
         id
     end
+  end
+
+  defp unload_pc_assigns(socket) do
+    assign(socket,
+      pc_id: nil,
+      pc_name: nil,
+      location: nil,
+      current_hp: nil,
+      max_hp: nil,
+      region_id: nil,
+      region_map: nil
+    )
   end
 
   defp nearby_cells(region_map, pc_location) do

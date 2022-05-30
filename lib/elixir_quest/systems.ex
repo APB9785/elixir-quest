@@ -9,10 +9,10 @@ defmodule ElixirQuest.Systems do
   alias ElixirQuest.Components.Cooldown
   alias ElixirQuest.Components.Dead
   alias ElixirQuest.Components.Equipment
-  alias ElixirQuest.Components.Experience
+  # alias ElixirQuest.Components.Experience
   alias ElixirQuest.Components.Health
   alias ElixirQuest.Components.Image
-  alias ElixirQuest.Components.Level
+  # alias ElixirQuest.Components.Level
   alias ElixirQuest.Components.Location
   alias ElixirQuest.Components.MovementSpeed
   alias ElixirQuest.Components.Moving
@@ -223,22 +223,7 @@ defmodule ElixirQuest.Systems do
   def backup_state do
     pc_ids = PlayerChar.get_all()
 
-    Enum.each(pc_ids, fn pc_id ->
-      {current_hp, max_hp} = Health.get(pc_id)
-      {region, x, y} = Location.get(pc_id)
-
-      attrs = %{
-        level: Level.get(pc_id),
-        experience: Experience.get(pc_id),
-        max_hp: max_hp,
-        current_hp: current_hp,
-        x_pos: x,
-        y_pos: y,
-        region_id: region
-      }
-
-      PlayerChars.save(pc_id, attrs)
-    end)
+    Enum.each(pc_ids, &PlayerChars.save/1)
   end
 
   @frequency {:respawn, 100}

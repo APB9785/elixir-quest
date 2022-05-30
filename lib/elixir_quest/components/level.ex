@@ -20,4 +20,10 @@ defmodule ElixirQuest.Components.Level do
       {^entity_id, level} -> level
     end
   end
+
+  def remove(entity_id) do
+    __MODULE__
+    |> Ets.wrap_existing!()
+    |> Ets.delete!(entity_id)
+  end
 end

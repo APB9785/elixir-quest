@@ -18,4 +18,10 @@ defmodule ElixirQuest.Components.Equipment do
     |> Ets.wrap_existing!()
     |> Ets.get!(entity_id)
   end
+
+  def remove(entity_id) do
+    __MODULE__
+    |> Ets.wrap_existing!()
+    |> Ets.delete!(entity_id)
+  end
 end

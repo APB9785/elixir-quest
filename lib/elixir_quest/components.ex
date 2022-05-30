@@ -111,6 +111,20 @@ defmodule ElixirQuest.Components do
     end
   end
 
+  def handle_call({:despawn_pc, %PC{id: id}}, _from, state) do
+    Location.remove(id)
+    Health.remove(id)
+    PlayerChar.remove(id)
+    Level.remove(id)
+    Experience.remove(id)
+    Image.remove(id)
+    Name.remove(id)
+    Equipment.remove(id)
+    MovementSpeed.remove(id)
+
+    {:reply, :success, state}
+  end
+
   def handle_cast({:add_moving, entity_id, direction}, state) do
     Moving.add(entity_id, direction)
 
@@ -154,6 +168,10 @@ defmodule ElixirQuest.Components do
   """
   def spawn_pc(%PC{} = pc) do
     GenServer.call(__MODULE__, {:spawn_pc, pc})
+  end
+
+  def despawn_pc(%PC{} = pc) do
+    GenServer.call(__MODULE__, {:despawn_pc, pc})
   end
 
   def add_moving(entity_id, direction) do
