@@ -5,7 +5,7 @@ defmodule ElixirQuest.Ticker do
   """
   use GenServer
 
-  alias ElixirQuest.Systems
+  alias ElixirQuest.Manager
   alias ElixirQuest.Utils
   alias Phoenix.PubSub
 
@@ -25,8 +25,8 @@ defmodule ElixirQuest.Ticker do
   end
 
   defp final_tick do
-    Systems.frequencies()
-    |> Enum.map(fn {_system_name, frequency} -> frequency end)
+    Manager.systems()
+    |> Enum.map(fn system -> system.__period__() end)
     |> Utils.lcm()
   end
 

@@ -1,28 +1,18 @@
-defmodule ElixirQuest.Components.Location do
+defmodule ElixirQuest.Aspects.Location do
   @moduledoc """
   All entities which physically exist in the game world will have a Location component
   with the id of its region and the x/y coordinates where it are currently located.
   """
+  use ECSx.Aspect,
+    schema: {:entity_id, :region_id, :x, :y}
+
   alias ETS.Set, as: Ets
   alias Phoenix.PubSub
 
-  def initialize_table, do: Ets.new!(name: __MODULE__)
-
-  def add(entity_id, region_id, x, y) do
-    __MODULE__
-    |> Ets.wrap_existing!()
-    |> Ets.put!({entity_id, region_id, x, y})
+  def add_and_broadcast(entity_id, region_id, x, y) do
+    add(entity_id: entity_id, region_id: region_id, x: x, y: y)
 
     PubSub.broadcast(EQPubSub, "region:#{region_id}", {:spawned, entity_id, {x, y}})
-  end
-
-  def get(entity_id) do
-    table = Ets.wrap_existing!(__MODULE__)
-
-    case Ets.get!(table, entity_id) do
-      nil -> nil
-      {^entity_id, region, x_pos, y_pos} -> {region, x_pos, y_pos}
-    end
   end
 
   def get_all_from_region(region_id) do
@@ -31,12 +21,10 @@ defmodule ElixirQuest.Components.Location do
     |> Ets.match_object!({:_, region_id, :_, :_})
   end
 
-  def remove(entity_id) do
-    {region_id, x, y} = get(entity_id)
+  def remove_and_broadcast(entity_id) do
+    %{region_id: region_id, x: x, y: y} = get(entity_id)
 
-    __MODULE__
-    |> Ets.wrap_existing!()
-    |> Ets.delete!(entity_id)
+    remove(entity_id)
 
     PubSub.broadcast(EQPubSub, "region:#{region_id}", {:removed, entity_id, {x, y}})
   end

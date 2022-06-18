@@ -5,11 +5,11 @@ defmodule ElixirQuest.PlayerChars do
   import Ecto.Query
 
   alias ElixirQuest.Accounts.Account
-  alias ElixirQuest.Components
-  alias ElixirQuest.Components.Experience
-  alias ElixirQuest.Components.Health
-  alias ElixirQuest.Components.Level
-  alias ElixirQuest.Components.Location
+  alias ElixirQuest.Aspects.Experience
+  alias ElixirQuest.Aspects.Health
+  alias ElixirQuest.Aspects.Level
+  alias ElixirQuest.Aspects.Location
+  alias ElixirQuest.Manager
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
   alias ElixirQuest.Repo
@@ -36,12 +36,12 @@ defmodule ElixirQuest.PlayerChars do
   def load!(id), do: Repo.get!(PC, id)
 
   def save(pc_id) do
-    {current_hp, max_hp} = Health.get(pc_id)
-    {region, x, y} = Location.get(pc_id)
+    %{current_hp: current_hp, max_hp: max_hp} = Health.get(pc_id)
+    %{region_id: region, x: x, y: y} = Location.get(pc_id)
 
     attrs = %{
-      level: Level.get(pc_id),
-      experience: Experience.get(pc_id),
+      level: Level.get_value(pc_id, :level),
+      experience: Experience.get_value(pc_id, :experience),
       max_hp: max_hp,
       current_hp: current_hp,
       x_pos: x,
@@ -57,7 +57,7 @@ defmodule ElixirQuest.PlayerChars do
 
   def log_out(pc_id) do
     with {:ok, pc} <- save(pc_id) do
-      Components.despawn_pc(pc)
+      Manager.despawn_pc(pc)
     end
   end
 

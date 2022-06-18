@@ -2,7 +2,7 @@ defmodule ElixirQuest.Application do
   @moduledoc false
   use Application
 
-  alias ElixirQuest.Components
+  alias ElixirQuest.Manager
   alias ElixirQuest.Ticker
 
   @impl true
@@ -11,7 +11,7 @@ defmodule ElixirQuest.Application do
       ElixirQuest.Repo,
       ElixirQuestWeb.Telemetry,
       {Phoenix.PubSub, name: EQPubSub},
-      Components,
+      Manager,
       Ticker,
       ElixirQuestWeb.Endpoint
     ]

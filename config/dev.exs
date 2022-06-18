@@ -7,6 +7,7 @@ config :elixir_quest, ElixirQuest.Repo,
   database: "elixir_quest_dev",
   hostname: "localhost",
   show_sensitive_data_on_connection_error: true,
+  stacktrace: true,
   pool_size: 10
 
 # For development, we disable any cache and enable

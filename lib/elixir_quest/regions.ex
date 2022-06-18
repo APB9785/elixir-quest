@@ -4,8 +4,8 @@ defmodule ElixirQuest.Regions do
   """
   import Ecto.Query
 
-  alias ElixirQuest.Components.Image
-  alias ElixirQuest.Components.Location
+  alias ElixirQuest.Aspects.Image
+  alias ElixirQuest.Aspects.Location
   alias ElixirQuest.Regions.Region
   alias ElixirQuest.Repo
 
@@ -42,8 +42,12 @@ defmodule ElixirQuest.Regions do
 
   defp parse_txt(["#" | rest], region_id, x, y) do
     id = Ecto.UUID.generate()
-    Location.add(id, region_id, x, y)
-    Image.add(id, "rock_mount.png")
+
+    # Not broadcasting this because it seems like it should happen before any players join
+    # If there's any problems just switch to `add_and_broadcast/4`
+    Location.add(entity_id: id, region_id: region_id, x: x, y: y)
+
+    Image.add(entity_id: id, image_filename: "rock_mount.png")
     parse_txt(rest, region_id, x + 1, y)
   end
 end

@@ -4,12 +4,13 @@ defmodule ElixirQuestWeb.Game do
   """
   use ElixirQuestWeb, :live_view
 
+  alias ECSx.Component
   alias ElixirQuest.Accounts
-  alias ElixirQuest.Components
-  alias ElixirQuest.Components.Health
-  alias ElixirQuest.Components.Image
-  alias ElixirQuest.Components.Location
-  alias ElixirQuest.Components.Name
+  alias ElixirQuest.Aspects.Health
+  alias ElixirQuest.Aspects.Image
+  alias ElixirQuest.Aspects.Location
+  alias ElixirQuest.Aspects.Name
+  alias ElixirQuest.Manager
   alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Utils
@@ -99,7 +100,7 @@ defmodule ElixirQuestWeb.Game do
         {:noreply, socket}
 
       new_direction ->
-        Components.add_moving(pc_id, new_direction)
+        Manager.add_moving(pc_id, new_direction)
         {:noreply, assign(socket, move_direction: new_direction)}
     end
   end
@@ -114,17 +115,17 @@ defmodule ElixirQuestWeb.Game do
         {:noreply, socket}
 
       nil ->
-        Components.remove_moving(pc_id)
+        Manager.remove_moving(pc_id)
         {:noreply, assign(socket, move_direction: nil)}
 
       new_direction ->
-        Components.add_moving(pc_id, new_direction)
+        Manager.add_moving(pc_id, new_direction)
         {:noreply, assign(socket, move_direction: new_direction)}
     end
   end
 
   def handle_event("target", %{"id" => nil}, socket) do
-    Components.cancel_attack(socket.assigns.pc_id)
+    Manager.cancel_attack(socket.assigns.pc_id)
 
     {:noreply, remove_target(socket)}
   end
@@ -133,16 +134,16 @@ defmodule ElixirQuestWeb.Game do
     %{attacking?: attacking?, pc_id: pc_id} = socket.assigns
 
     PubSub.subscribe(EQPubSub, "entity:#{target_id}")
-    {current_hp, max_hp} = Health.get(target_id)
+    %{current_hp: current_hp, max_hp: max_hp} = Health.get(target_id)
 
-    if attacking?, do: Components.begin_attack(pc_id, target_id)
+    if attacking?, do: Manager.begin_attack(pc_id, target_id)
 
     {:noreply,
      assign(socket,
        target_id: target_id,
        target_hp: current_hp,
        target_max_hp: max_hp,
-       target_name: Name.get(target_id)
+       target_name: Name.get_value(target_id, :name)
      )}
   end
 
@@ -150,10 +151,10 @@ defmodule ElixirQuestWeb.Game do
     %{pc_id: id, target_id: target_id} = socket.assigns
 
     if socket.assigns.attacking? do
-      Components.cancel_attack(id)
+      Manager.cancel_attack(id)
       {:noreply, assign(socket, attacking?: false)}
     else
-      Components.begin_attack(id, target_id)
+      Manager.begin_attack(id, target_id)
       {:noreply, assign(socket, attacking?: true)}
     end
   end
@@ -201,7 +202,7 @@ defmodule ElixirQuestWeb.Game do
   end
 
   def handle_info({:spawned, entity_id, location}, socket) do
-    image = Image.get(entity_id)
+    image = Image.get_value(entity_id, :image_filename)
     new_region_map = Map.put(socket.assigns.region_map, location, {entity_id, image})
 
     {:noreply, assign(socket, region_map: new_region_map)}
@@ -243,7 +244,6 @@ defmodule ElixirQuestWeb.Game do
   end
 
   def handle_info({:log_entry, entry}, socket) do
-    IO.inspect("log received")
     {:noreply, assign(socket, logs: [entry])}
   end
 
@@ -261,7 +261,7 @@ defmodule ElixirQuestWeb.Game do
   end
 
   defp spawn_pc(%PC{id: id} = pc) do
-    case Components.spawn_pc(pc) do
+    case Manager.spawn_pc(pc) do
       :blocked ->
         Process.sleep(1000)
         spawn_pc(pc)
@@ -302,7 +302,7 @@ defmodule ElixirQuestWeb.Game do
   end
 
   defp get_image({entity_id, _region_id, x, y}) do
-    {x, y, entity_id, Image.get(entity_id)}
+    {x, y, entity_id, Image.get_value(entity_id, :image_filename)}
   end
 
   # This is kinda hack-y, and is only here to prevent setting the target to a boundary or

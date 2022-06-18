@@ -4,18 +4,20 @@ defmodule ElixirQuest.Mobs do
   """
   import Ecto.Query
 
-  alias ElixirQuest.Components.Aggro
-  alias ElixirQuest.Components.Health
-  alias ElixirQuest.Components.Image
-  alias ElixirQuest.Components.Location
-  alias ElixirQuest.Components.MovementSpeed
-  alias ElixirQuest.Components.Name
-  alias ElixirQuest.Components.Wandering
+  alias ElixirQuest.Aspects.Aggro
+  alias ElixirQuest.Aspects.Equipment
+  alias ElixirQuest.Aspects.Health
+  alias ElixirQuest.Aspects.Image
+  alias ElixirQuest.Aspects.Location
+  alias ElixirQuest.Aspects.MovementSpeed
+  alias ElixirQuest.Aspects.Name
+  alias ElixirQuest.Aspects.Wandering
   alias ElixirQuest.Mobs.Mob
   alias ElixirQuest.Repo
 
   @default_mob_image_filename "goblin.png"
   @mob_wandering_speed 1000
+  @goblin_weapon_stats %{name: "hands", damage: 1, cooldown: 4000, range: 1.9}
 
   def new!(attrs) do
     %Mob{}
@@ -51,12 +53,13 @@ defmodule ElixirQuest.Mobs do
   Spawn a mob by inserting all its necessary components.
   """
   def spawn(%Mob{id: id} = mob) do
-    Location.add(id, mob.region_id, mob.x_pos, mob.y_pos)
-    Health.add(id, mob.max_hp, mob.max_hp)
-    Wandering.add(id)
-    Aggro.add(id, mob.aggro_range)
-    Image.add(id, @default_mob_image_filename)
-    Name.add(id, mob.name)
-    MovementSpeed.add(id, @mob_wandering_speed)
+    Location.add_and_broadcast(id, mob.region_id, mob.x_pos, mob.y_pos)
+    Health.add(entity_id: id, current_hp: mob.max_hp, max_hp: mob.max_hp)
+    Wandering.add(entity_id: id)
+    Aggro.add(entity_id: id, aggro_range: mob.aggro_range)
+    Image.add(entity_id: id, image_filename: @default_mob_image_filename)
+    Name.add(entity_id: id, name: mob.name)
+    MovementSpeed.add(entity_id: id, movement_speed: @mob_wandering_speed)
+    Equipment.add(entity_id: id, equipment_map: %{weapon: @goblin_weapon_stats})
   end
 end

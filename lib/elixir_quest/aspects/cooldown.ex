@@ -1,17 +1,13 @@
-defmodule ElixirQuest.Components.Cooldown do
+defmodule ElixirQuest.Aspects.Cooldown do
   @moduledoc """
   Whenever an entity takes an action, it gains a Cooldown component, which stores the
   timestamp of when the cooldown expires and the action may be taken again.
   """
+  use ECSx.Aspect,
+    schema: {:entity_id, :action, :timestamp},
+    table_type: :bag
+
   alias ETS.Bag, as: Ets
-
-  def initialize_table, do: Ets.new!(name: __MODULE__)
-
-  def add(entity_id, action, timestamp) do
-    __MODULE__
-    |> Ets.wrap_existing!()
-    |> Ets.add!({entity_id, action, timestamp})
-  end
 
   def remove(entity_id, action) do
     __MODULE__
@@ -26,11 +22,5 @@ defmodule ElixirQuest.Components.Cooldown do
       {[], :end_of_table} -> true
       {[_], _} -> false
     end
-  end
-
-  def get_all do
-    __MODULE__
-    |> Ets.wrap_existing!()
-    |> Ets.to_list!()
   end
 end

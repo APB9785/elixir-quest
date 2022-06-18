@@ -34,11 +34,12 @@ defmodule ElixirQuest.MixProject do
   defp deps do
     [
       {:bcrypt_elixir, "~> 2.0"},
-      {:ecto_sql, "~> 3.7"},
-      {:esbuild, "~> 0.2", runtime: Mix.env() == :dev},
+      {:ecsx, github: "APB9785/ECSx"},
+      {:ecto_sql, "~> 3.8"},
+      {:esbuild, "~> 0.5", runtime: Mix.env() == :dev},
       {:ets, "~> 0.9"},
       {:floki, ">= 0.32.0", only: :test},
-      {:gettext, "~> 0.18"},
+      {:gettext, "~> 0.19"},
       {:hackney, "~> 1.18"},
       {:jason, "~> 1.2"},
       {:phoenix, "~> 1.6"},
@@ -49,7 +50,7 @@ defmodule ElixirQuest.MixProject do
       {:phoenix_live_view, "~> 0.17"},
       {:plug_cowboy, "~> 2.5"},
       {:postgrex, ">= 0.0.0"},
-      {:swoosh, "~> 1.6"},
+      {:swoosh, "~> 1.7"},
       {:tailwind, "~> 0.1", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"}

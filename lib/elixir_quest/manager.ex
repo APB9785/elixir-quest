@@ -1,6 +1,6 @@
-defmodule ElixirQuest.Components do
+defmodule ElixirQuest.Manager do
   @moduledoc """
-  The Components server spanws and owns all Component tables.  No other process may write to the
+  The Manager spawns and owns all Component tables.  No other process may write to the
   tables - this ensures activity is serialized to prevent race conditions.
 
   Each tick, this server will run the appropriate Systems, writing the updates as it goes.
@@ -9,33 +9,28 @@ defmodule ElixirQuest.Components do
   """
   use GenServer
 
-  alias ElixirQuest.Components.Aggro
-  alias ElixirQuest.Components.Attacking
-  alias ElixirQuest.Components.Cooldown
-  alias ElixirQuest.Components.Dead
-  alias ElixirQuest.Components.Equipment
-  alias ElixirQuest.Components.Experience
-  alias ElixirQuest.Components.Health
-  alias ElixirQuest.Components.Image
-  alias ElixirQuest.Components.Level
-  alias ElixirQuest.Components.Location
-  alias ElixirQuest.Components.Moving
-  alias ElixirQuest.Components.MovementSpeed
-  alias ElixirQuest.Components.Name
-  alias ElixirQuest.Components.PlayerChar
-  alias ElixirQuest.Components.Respawn
-  alias ElixirQuest.Components.Seeking
-  alias ElixirQuest.Components.Wandering
+  alias ElixirQuest.Aspects.Aggro
+  alias ElixirQuest.Aspects.Attacking
+  alias ElixirQuest.Aspects.Cooldown
+  alias ElixirQuest.Aspects.Dead
+  alias ElixirQuest.Aspects.Equipment
+  alias ElixirQuest.Aspects.Experience
+  alias ElixirQuest.Aspects.Health
+  alias ElixirQuest.Aspects.Image
+  alias ElixirQuest.Aspects.Level
+  alias ElixirQuest.Aspects.Location
+  alias ElixirQuest.Aspects.Moving
+  alias ElixirQuest.Aspects.MovementSpeed
+  alias ElixirQuest.Aspects.Name
+  alias ElixirQuest.Aspects.PlayerChar
+  alias ElixirQuest.Aspects.Respawn
+  alias ElixirQuest.Aspects.Seeking
+  alias ElixirQuest.Aspects.Wandering
   alias ElixirQuest.Logs
   alias ElixirQuest.Mobs
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
-  alias ElixirQuest.Systems
   alias Phoenix.PubSub
-
-  require Logger
-
-  @system_frequencies Systems.frequencies()
 
   @pc_image_filename "knight.png"
   @pc_base_movement_speed 250
@@ -46,30 +41,9 @@ defmodule ElixirQuest.Components do
   end
 
   def init(_) do
-    Logger.info("Components initialized")
     PubSub.subscribe(EQPubSub, "tick")
 
-    component_modules = [
-      Aggro,
-      Attacking,
-      Cooldown,
-      Dead,
-      Equipment,
-      Experience,
-      Health,
-      Image,
-      Level,
-      Location,
-      MovementSpeed,
-      Moving,
-      Name,
-      PlayerChar,
-      Respawn,
-      Seeking,
-      Wandering
-    ]
-
-    Enum.each(component_modules, &apply(&1, :initialize_table, []))
+    Enum.each(aspects(), fn module -> module.init() end)
 
     {:ok, [], {:continue, :load}}
   end
@@ -94,15 +68,15 @@ defmodule ElixirQuest.Components do
         {:reply, :blocked, state}
 
       :otherwise ->
-        Location.add(id, pc.region_id, pc.x_pos, pc.y_pos)
-        Health.add(id, pc.current_hp, pc.max_hp)
-        PlayerChar.add(id)
-        Level.add(id, pc.level)
-        Experience.add(id, pc.experience)
-        Image.add(id, @pc_image_filename)
-        Name.add(id, pc.name)
-        Equipment.add(id, %{weapon: @weapon_hands_stats})
-        MovementSpeed.add(id, @pc_base_movement_speed)
+        Location.add_and_broadcast(id, pc.region_id, pc.x_pos, pc.y_pos)
+        Health.add(entity_id: id, current_hp: pc.current_hp, max_hp: pc.max_hp)
+        PlayerChar.add(entity_id: id)
+        Level.add(entity_id: id, level: pc.level)
+        Experience.add(entity_id: id, experience: pc.experience)
+        Image.add(entity_id: id, image_filename: @pc_image_filename)
+        Name.add(entity_id: id, name: pc.name)
+        Equipment.add(entity_id: id, equipment_map: %{weapon: @weapon_hands_stats})
+        MovementSpeed.add(entity_id: id, movement_speed: @pc_base_movement_speed)
 
         log_entry = Logs.from_spawn(pc.name)
         PubSub.broadcast(EQPubSub, "region:#{pc.region_id}", {:log_entry, log_entry})
@@ -112,7 +86,8 @@ defmodule ElixirQuest.Components do
   end
 
   def handle_call({:despawn_pc, %PC{id: id}}, _from, state) do
-    Location.remove(id)
+    Location.remove_and_broadcast(id)
+
     Health.remove(id)
     PlayerChar.remove(id)
     Level.remove(id)
@@ -126,7 +101,7 @@ defmodule ElixirQuest.Components do
   end
 
   def handle_cast({:add_moving, entity_id, direction}, state) do
-    Moving.add(entity_id, direction)
+    Moving.add(entity_id: entity_id, direction: direction)
 
     {:noreply, state}
   end
@@ -138,7 +113,7 @@ defmodule ElixirQuest.Components do
   end
 
   def handle_cast({:begin_attack, entity_id, target_id}, state) do
-    Attacking.add(entity_id, target_id)
+    Attacking.add(entity_id: entity_id, target_id: target_id)
 
     {:noreply, state}
   end
@@ -152,13 +127,51 @@ defmodule ElixirQuest.Components do
   def handle_info({:tick, tick}, state) do
     # TODO: make this async?
 
-    Enum.each(@system_frequencies, fn {system, frequency} ->
-      if rem(tick, frequency) == 0 do
-        apply(Systems, system, [])
+    Enum.each(systems(), fn system ->
+      if rem(tick, system.__period__()) == 0 do
+        system.run()
       end
     end)
 
     {:noreply, state}
+  end
+
+  ## Component / System Modules
+
+  def aspects do
+    [
+      Aggro,
+      Attacking,
+      Cooldown,
+      Dead,
+      Equipment,
+      Experience,
+      Health,
+      Image,
+      Level,
+      Location,
+      MovementSpeed,
+      Moving,
+      Name,
+      PlayerChar,
+      Respawn,
+      Seeking,
+      Wandering
+    ]
+  end
+
+  def systems do
+    [
+      ElixirQuest.Systems.Aggro,
+      ElixirQuest.Systems.Attacks,
+      ElixirQuest.Systems.BackupState,
+      ElixirQuest.Systems.Death,
+      ElixirQuest.Systems.Movement,
+      ElixirQuest.Systems.PruneCooldowns,
+      ElixirQuest.Systems.Respawn,
+      ElixirQuest.Systems.Seek,
+      ElixirQuest.Systems.Wander
+    ]
   end
 
   ## LiveView Client API
