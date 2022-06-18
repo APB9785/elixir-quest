@@ -1,9 +1,9 @@
 # ElixirQuest
 
-ElixirQuest is a 2-D MMORPG game server implementing ECS (Entity-Component-System) architecture.
+ElixirQuest is a 2-D Fantasy MMORPG game built to showcase ECSx.
 
-Backend uses ETS for active game entities, and Postgres for persistence.
-Frontend uses Phoenix LiveView rendering simple assets.
+In addition to ECSx, we're also using Phoenix LiveView for rendering the web interface and  
+Ecto + Postgres for persistence.  
 
 ## Goals
 
