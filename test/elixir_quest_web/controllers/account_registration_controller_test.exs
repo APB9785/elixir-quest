@@ -9,11 +9,15 @@ defmodule ElixirQuestWeb.AccountRegistrationControllerTest do
       response = html_response(conn, 200)
       assert response =~ "<h1>Register</h1>"
       assert response =~ "Log in</a>"
-      assert response =~ "Register</a>"
+      assert response =~ "Register</button>"
     end
 
     test "redirects if already logged in", %{conn: conn} do
-      conn = conn |> log_in_account(account_fixture()) |> get(Routes.account_registration_path(conn, :new))
+      conn =
+        conn
+        |> log_in_account(account_fixture())
+        |> get(Routes.account_registration_path(conn, :new))
+
       assert redirected_to(conn) == "/"
     end
   end
@@ -34,21 +38,20 @@ defmodule ElixirQuestWeb.AccountRegistrationControllerTest do
       # Now do a logged in request and assert on the menu
       conn = get(conn, "/")
       response = html_response(conn, 200)
-      assert response =~ email
-      assert response =~ "Settings</a>"
-      assert response =~ "Log out</a>"
+      assert response =~ "Account created successfully"
+      assert response =~ "Create character"
     end
 
     test "render errors for invalid data", %{conn: conn} do
       conn =
         post(conn, Routes.account_registration_path(conn, :create), %{
-          "account" => %{"email" => "with spaces", "password" => "too short"}
+          "account" => %{"email" => "with spaces", "password" => "short"}
         })
 
       response = html_response(conn, 200)
       assert response =~ "<h1>Register</h1>"
       assert response =~ "must have the @ sign and no spaces"
-      assert response =~ "should be at least 12 character"
+      assert response =~ "should be at least 8 character"
     end
   end
 end

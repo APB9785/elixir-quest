@@ -1,5 +1,6 @@
 defmodule ElixirQuestWeb.PageControllerTest do
-  use ElixirQuestWeb.DataCase
+  use ElixirQuest.DataCase
+
   alias ElixirQuest.Utils
 
   test "lcm/1" do

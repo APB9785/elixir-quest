@@ -44,14 +44,14 @@ defmodule ElixirQuestWeb.AccountSettingsControllerTest do
           "action" => "update_password",
           "current_password" => "invalid",
           "account" => %{
-            "password" => "too short",
+            "password" => "short",
             "password_confirmation" => "does not match"
           }
         })
 
       response = html_response(old_password_conn, 200)
       assert response =~ "<h1>Settings</h1>"
-      assert response =~ "should be at least 12 character(s)"
+      assert response =~ "should be at least 8 character(s)"
       assert response =~ "does not match password"
       assert response =~ "is not valid"
 
@@ -95,13 +95,22 @@ defmodule ElixirQuestWeb.AccountSettingsControllerTest do
 
       token =
         extract_account_token(fn url ->
-          Accounts.deliver_update_email_instructions(%{account | email: email}, account.email, url)
+          Accounts.deliver_update_email_instructions(
+            %{account | email: email},
+            account.email,
+            url
+          )
         end)
 
       %{token: token, email: email}
     end
 
-    test "updates the account email once", %{conn: conn, account: account, token: token, email: email} do
+    test "updates the account email once", %{
+      conn: conn,
+      account: account,
+      token: token,
+      email: email
+    } do
       conn = get(conn, Routes.account_settings_path(conn, :confirm_email, token))
       assert redirected_to(conn) == Routes.account_settings_path(conn, :edit)
       assert get_flash(conn, :info) =~ "Email changed successfully"

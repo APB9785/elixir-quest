@@ -27,7 +27,9 @@ defmodule ElixirQuestWeb.AccountResetPasswordControllerTest do
 
       assert redirected_to(conn) == "/"
       assert get_flash(conn, :info) =~ "If your email is in our system"
-      assert Repo.get_by!(Accounts.AccountToken, account_id: account.id).context == "reset_password"
+
+      assert Repo.get_by!(Accounts.AccountToken, account_id: account.id).context ==
+               "reset_password"
     end
 
     test "does not send reset password token if email is invalid", %{conn: conn} do
@@ -93,14 +95,14 @@ defmodule ElixirQuestWeb.AccountResetPasswordControllerTest do
       conn =
         put(conn, Routes.account_reset_password_path(conn, :update, token), %{
           "account" => %{
-            "password" => "too short",
+            "password" => "short",
             "password_confirmation" => "does not match"
           }
         })
 
       response = html_response(conn, 200)
       assert response =~ "<h1>Reset password</h1>"
-      assert response =~ "should be at least 12 character(s)"
+      assert response =~ "should be at least 8 character(s)"
       assert response =~ "does not match password"
     end
 

@@ -38,7 +38,8 @@ defmodule ElixirQuest.AccountsTest do
   describe "get_account!/1" do
     test "raises if id is invalid" do
       assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_account!(-1)
+        new_uuid = Ecto.UUID.generate()
+        Accounts.get_account!(new_uuid)
       end
     end
 
@@ -59,11 +60,11 @@ defmodule ElixirQuest.AccountsTest do
     end
 
     test "validates email and password when given" do
-      {:error, changeset} = Accounts.register_account(%{email: "not valid", password: "not valid"})
+      {:error, changeset} = Accounts.register_account(%{email: "not valid", password: "short"})
 
       assert %{
                email: ["must have the @ sign and no spaces"],
-               password: ["should be at least 12 character(s)"]
+               password: ["should be at least 8 character(s)"]
              } = errors_on(changeset)
     end
 
@@ -168,7 +169,10 @@ defmodule ElixirQuest.AccountsTest do
 
     test "applies the email without persisting it", %{account: account} do
       email = unique_account_email()
-      {:ok, account} = Accounts.apply_account_email(account, valid_account_password(), %{email: email})
+
+      {:ok, account} =
+        Accounts.apply_account_email(account, valid_account_password(), %{email: email})
+
       assert account.email == email
       assert Accounts.get_account!(account.id).email != email
     end
@@ -200,7 +204,11 @@ defmodule ElixirQuest.AccountsTest do
 
       token =
         extract_account_token(fn url ->
-          Accounts.deliver_update_email_instructions(%{account | email: email}, account.email, url)
+          Accounts.deliver_update_email_instructions(
+            %{account | email: email},
+            account.email,
+            url
+          )
         end)
 
       %{account: account, token: token, email: email}
@@ -223,7 +231,9 @@ defmodule ElixirQuest.AccountsTest do
     end
 
     test "does not update email if account email changed", %{account: account, token: token} do
-      assert Accounts.update_account_email(%{account | email: "current@example.com"}, token) == :error
+      assert Accounts.update_account_email(%{account | email: "current@example.com"}, token) ==
+               :error
+
       assert Repo.get!(Account, account.id).email == account.email
       assert Repo.get_by(AccountToken, account_id: account.id)
     end
@@ -262,12 +272,12 @@ defmodule ElixirQuest.AccountsTest do
     test "validates password", %{account: account} do
       {:error, changeset} =
         Accounts.update_account_password(account, valid_account_password(), %{
-          password: "not valid",
+          password: "short",
           password_confirmation: "another"
         })
 
       assert %{
-               password: ["should be at least 12 character(s)"],
+               password: ["should be at least 8 character(s)"],
                password_confirmation: ["does not match password"]
              } = errors_on(changeset)
     end
@@ -471,12 +481,12 @@ defmodule ElixirQuest.AccountsTest do
     test "validates password", %{account: account} do
       {:error, changeset} =
         Accounts.reset_account_password(account, %{
-          password: "not valid",
+          password: "short",
           password_confirmation: "another"
         })
 
       assert %{
-               password: ["should be at least 12 character(s)"],
+               password: ["should be at least 8 character(s)"],
                password_confirmation: ["does not match password"]
              } = errors_on(changeset)
     end
@@ -488,7 +498,9 @@ defmodule ElixirQuest.AccountsTest do
     end
 
     test "updates the password", %{account: account} do
-      {:ok, updated_account} = Accounts.reset_account_password(account, %{password: "new valid password"})
+      {:ok, updated_account} =
+        Accounts.reset_account_password(account, %{password: "new valid password"})
+
       assert is_nil(updated_account.password)
       assert Accounts.get_account_by_email_and_password(account.email, "new valid password")
     end
