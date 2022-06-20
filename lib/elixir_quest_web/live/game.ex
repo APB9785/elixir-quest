@@ -4,7 +4,6 @@ defmodule ElixirQuestWeb.Game do
   """
   use ElixirQuestWeb, :live_view
 
-  alias ECSx.Component
   alias ElixirQuest.Accounts
   alias ElixirQuest.Aspects.Health
   alias ElixirQuest.Aspects.Image
