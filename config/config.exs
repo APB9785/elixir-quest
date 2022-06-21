@@ -20,8 +20,11 @@ config :elixir_quest, ElixirQuestWeb.Endpoint,
 # Configures the repo
 config :elixir_quest, ElixirQuest.Repo, migration_primary_key: [type: :binary_id]
 
+# Configures the mailer API module
+config :elixir_quest, ElixirQuest.Mailer, api: ElixirQuest.Mailer.Swoosh
+
 # Configures the mailer
-config :elixir_quest, ElixirQuest.Mailer,
+config :elixir_quest, ElixirQuest.Mailer.Swoosh,
   adapter: Swoosh.Adapters.Postmark,
   api_key: {:system, "POSTMARK_API_KEY"}
 

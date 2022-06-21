@@ -28,3 +28,6 @@ config :logger, level: :warn
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Configures the mailer API module
+config :elixir_quest, ElixirQuest.Mailer, api: ElixirQuest.Mailer.Mock
