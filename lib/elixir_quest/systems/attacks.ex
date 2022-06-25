@@ -25,11 +25,11 @@ defmodule ElixirQuest.Systems.Attacks do
         target_already_dead?(target_id) ->
           unless PlayerChar.has_component?(attacker_id) do
             # Mobs should go back to wandering
-            Seeking.remove(attacker_id)
-            Wandering.add(entity_id: attacker_id)
+            Seeking.remove_component(attacker_id)
+            Wandering.add_component(entity_id: attacker_id)
           end
 
-          Attacking.remove(attacker_id)
+          Attacking.remove_component(attacker_id)
 
         :otherwise ->
           attempt_attack(attacker_id, target_id)
@@ -42,15 +42,15 @@ defmodule ElixirQuest.Systems.Attacks do
   end
 
   defp attempt_attack(attacker_id, target_id) do
-    attacker_location = Location.get(attacker_id)
-    target_location = Location.get(target_id)
+    attacker_location = Location.get_component(attacker_id)
+    target_location = Location.get_component(target_id)
 
     %{weapon: %{damage: weapon_dmg, cooldown: weapon_cd, range: weapon_range}} =
       Equipment.get_value(attacker_id, :equipment_map)
 
     if within_range?(attacker_location, target_location, weapon_range) do
       next_attack = NaiveDateTime.utc_now() |> NaiveDateTime.add(weapon_cd, :millisecond)
-      Cooldown.add(entity_id: attacker_id, action: :attack, timestamp: next_attack)
+      Cooldown.add_component(entity_id: attacker_id, action: :attack, timestamp: next_attack)
 
       attacker_id
       |> Logs.from_attack(target_id, weapon_dmg)
@@ -58,7 +58,7 @@ defmodule ElixirQuest.Systems.Attacks do
 
       new_hp = Health.decrease_current_hp(target_id, weapon_dmg)
 
-      if new_hp <= 0, do: Dead.add(entity_id: target_id)
+      if new_hp <= 0, do: Dead.add_component(entity_id: target_id)
     end
   end
 

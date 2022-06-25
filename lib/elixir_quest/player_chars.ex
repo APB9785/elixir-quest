@@ -36,8 +36,8 @@ defmodule ElixirQuest.PlayerChars do
   def load!(id), do: Repo.get!(PC, id)
 
   def save(pc_id) do
-    %{current_hp: current_hp, max_hp: max_hp} = Health.get(pc_id)
-    %{region_id: region, x: x, y: y} = Location.get(pc_id)
+    %{current_hp: current_hp, max_hp: max_hp} = Health.get_component(pc_id)
+    %{region_id: region, x: x, y: y} = Location.get_component(pc_id)
 
     attrs = %{
       level: Level.get_value(pc_id, :level),

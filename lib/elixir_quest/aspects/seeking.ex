@@ -7,7 +7,7 @@ defmodule ElixirQuest.Aspects.Seeking do
     schema: {:entity_id, :target_id}
 
   def has_target?(entity_id) do
-    case get(entity_id) do
+    case get_component(entity_id) do
       nil -> false
       _ -> true
     end

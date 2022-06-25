@@ -45,9 +45,9 @@ defmodule ElixirQuest.Regions do
 
     # Not broadcasting this because it seems like it should happen before any players join
     # If there's any problems just switch to `add_and_broadcast/4`
-    Location.add(entity_id: id, region_id: region_id, x: x, y: y)
+    Location.add_component(entity_id: id, region_id: region_id, x: x, y: y)
 
-    Image.add(entity_id: id, image_filename: "rock_mount.png")
+    Image.add_component(entity_id: id, image_filename: "rock_mount.png")
     parse_txt(rest, region_id, x + 1, y)
   end
 end

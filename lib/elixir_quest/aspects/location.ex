@@ -10,7 +10,7 @@ defmodule ElixirQuest.Aspects.Location do
   alias Phoenix.PubSub
 
   def add_and_broadcast(entity_id, region_id, x, y) do
-    add(entity_id: entity_id, region_id: region_id, x: x, y: y)
+    add_component(entity_id: entity_id, region_id: region_id, x: x, y: y)
 
     PubSub.broadcast(EQPubSub, "region:#{region_id}", {:spawned, entity_id, {x, y}})
   end
@@ -22,9 +22,9 @@ defmodule ElixirQuest.Aspects.Location do
   end
 
   def remove_and_broadcast(entity_id) do
-    %{region_id: region_id, x: x, y: y} = get(entity_id)
+    %{region_id: region_id, x: x, y: y} = get_component(entity_id)
 
-    remove(entity_id)
+    remove_component(entity_id)
 
     PubSub.broadcast(EQPubSub, "region:#{region_id}", {:removed, entity_id, {x, y}})
   end

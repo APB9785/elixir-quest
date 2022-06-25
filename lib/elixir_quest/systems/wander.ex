@@ -15,7 +15,7 @@ defmodule ElixirQuest.Systems.Wander do
       # However, it could be desirable to not implement this, if we want
       # mobs to spend more time near the walls.
 
-      Moving.add(entity_id: mob_id, direction: direction)
+      Moving.add_component(entity_id: mob_id, direction: direction)
     end)
   end
 end

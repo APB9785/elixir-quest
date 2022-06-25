@@ -13,8 +13,8 @@ defmodule ElixirQuest.Systems.Respawn do
     Enum.each(respawns, fn %{entity_id: entity_id, respawn_at: respawn_at} ->
       if NaiveDateTime.compare(respawn_at, now) == :lt do
         entity_id
-        |> tap(&Respawn.remove/1)
-        |> tap(&Dead.remove/1)
+        |> tap(&Respawn.remove_component/1)
+        |> tap(&Dead.remove_component/1)
         |> Mobs.get!()
         |> Mobs.spawn()
       end

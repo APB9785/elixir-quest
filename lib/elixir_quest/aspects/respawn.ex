@@ -14,6 +14,6 @@ defmodule ElixirQuest.Aspects.Respawn do
     # Eventually we probably want to pull this from the database too
     respawn_at = NaiveDateTime.add(now, @mob_respawn_seconds)
 
-    add(entity_id: entity_id, respawn_at: respawn_at)
+    add_component(entity_id: entity_id, respawn_at: respawn_at)
   end
 end

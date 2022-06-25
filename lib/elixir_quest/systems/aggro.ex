@@ -19,7 +19,7 @@ defmodule ElixirQuest.Systems.Aggro do
 
     pcs_with_coords_by_region =
       Enum.reduce(player_chars, %{}, fn %{entity_id: pc_id}, acc ->
-        %{region_id: region, x: x, y: y} = Location.get(pc_id)
+        %{region_id: region, x: x, y: y} = Location.get_component(pc_id)
         Map.update(acc, region, [{pc_id, x, y}], &[{pc_id, x, y} | &1])
       end)
 
@@ -31,7 +31,7 @@ defmodule ElixirQuest.Systems.Aggro do
   end
 
   defp look_for_targets(mob_id, aggro_range, pcs_with_coords_by_region) do
-    %{region_id: mob_region, x: mob_x, y: mob_y} = Location.get(mob_id)
+    %{region_id: mob_region, x: mob_x, y: mob_y} = Location.get_component(mob_id)
 
     case Map.get(pcs_with_coords_by_region, mob_region) do
       nil ->
@@ -45,9 +45,9 @@ defmodule ElixirQuest.Systems.Aggro do
             :noop
 
           {pc_id, _x, _y} ->
-            Wandering.remove(mob_id)
-            Seeking.add(entity_id: mob_id, target_id: pc_id)
-            Attacking.add(entity_id: mob_id, target_id: pc_id)
+            Wandering.remove_component(mob_id)
+            Seeking.add_component(entity_id: mob_id, target_id: pc_id)
+            Attacking.add_component(entity_id: mob_id, target_id: pc_id)
             MovementSpeed.update(mob_id, @mob_seeking_speed)
         end
     end

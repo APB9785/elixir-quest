@@ -11,7 +11,7 @@ defmodule ElixirQuest.Aspects.Health do
   Decrements the given entity's current hp.
   """
   def decrease_current_hp(entity_id, amount) do
-    %{current_hp: current_hp} = get(entity_id)
+    %{current_hp: current_hp} = get_component(entity_id)
     table = Ets.wrap_existing!(__MODULE__)
 
     new_hp = current_hp - amount

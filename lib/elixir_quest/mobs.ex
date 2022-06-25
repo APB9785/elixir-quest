@@ -54,12 +54,12 @@ defmodule ElixirQuest.Mobs do
   """
   def spawn(%Mob{id: id} = mob) do
     Location.add_and_broadcast(id, mob.region_id, mob.x_pos, mob.y_pos)
-    Health.add(entity_id: id, current_hp: mob.max_hp, max_hp: mob.max_hp)
-    Wandering.add(entity_id: id)
-    Aggro.add(entity_id: id, aggro_range: mob.aggro_range)
-    Image.add(entity_id: id, image_filename: @default_mob_image_filename)
-    Name.add(entity_id: id, name: mob.name)
-    MovementSpeed.add(entity_id: id, movement_speed: @mob_wandering_speed)
-    Equipment.add(entity_id: id, equipment_map: %{weapon: @goblin_weapon_stats})
+    Health.add_component(entity_id: id, current_hp: mob.max_hp, max_hp: mob.max_hp)
+    Wandering.add_component(entity_id: id)
+    Aggro.add_component(entity_id: id, aggro_range: mob.aggro_range)
+    Image.add_component(entity_id: id, image_filename: @default_mob_image_filename)
+    Name.add_component(entity_id: id, name: mob.name)
+    MovementSpeed.add_component(entity_id: id, movement_speed: @mob_wandering_speed)
+    Equipment.add_component(entity_id: id, equipment_map: %{weapon: @goblin_weapon_stats})
   end
 end

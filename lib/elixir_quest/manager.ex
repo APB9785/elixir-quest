@@ -69,14 +69,14 @@ defmodule ElixirQuest.Manager do
 
       :otherwise ->
         Location.add_and_broadcast(id, pc.region_id, pc.x_pos, pc.y_pos)
-        Health.add(entity_id: id, current_hp: pc.current_hp, max_hp: pc.max_hp)
-        PlayerChar.add(entity_id: id)
-        Level.add(entity_id: id, level: pc.level)
-        Experience.add(entity_id: id, experience: pc.experience)
-        Image.add(entity_id: id, image_filename: @pc_image_filename)
-        Name.add(entity_id: id, name: pc.name)
-        Equipment.add(entity_id: id, equipment_map: %{weapon: @weapon_hands_stats})
-        MovementSpeed.add(entity_id: id, movement_speed: @pc_base_movement_speed)
+        Health.add_component(entity_id: id, current_hp: pc.current_hp, max_hp: pc.max_hp)
+        PlayerChar.add_component(entity_id: id)
+        Level.add_component(entity_id: id, level: pc.level)
+        Experience.add_component(entity_id: id, experience: pc.experience)
+        Image.add_component(entity_id: id, image_filename: @pc_image_filename)
+        Name.add_component(entity_id: id, name: pc.name)
+        Equipment.add_component(entity_id: id, equipment_map: %{weapon: @weapon_hands_stats})
+        MovementSpeed.add_component(entity_id: id, movement_speed: @pc_base_movement_speed)
 
         log_entry = Logs.from_spawn(pc.name)
         PubSub.broadcast(EQPubSub, "region:#{pc.region_id}", {:log_entry, log_entry})
@@ -88,38 +88,38 @@ defmodule ElixirQuest.Manager do
   def handle_call({:despawn_pc, %PC{id: id}}, _from, state) do
     Location.remove_and_broadcast(id)
 
-    Health.remove(id)
-    PlayerChar.remove(id)
-    Level.remove(id)
-    Experience.remove(id)
-    Image.remove(id)
-    Name.remove(id)
-    Equipment.remove(id)
-    MovementSpeed.remove(id)
+    Health.remove_component(id)
+    PlayerChar.remove_component(id)
+    Level.remove_component(id)
+    Experience.remove_component(id)
+    Image.remove_component(id)
+    Name.remove_component(id)
+    Equipment.remove_component(id)
+    MovementSpeed.remove_component(id)
 
     {:reply, :success, state}
   end
 
   def handle_cast({:add_moving, entity_id, direction}, state) do
-    Moving.add(entity_id: entity_id, direction: direction)
+    Moving.add_component(entity_id: entity_id, direction: direction)
 
     {:noreply, state}
   end
 
   def handle_cast({:remove_moving, entity_id}, state) do
-    Moving.remove(entity_id)
+    Moving.remove_component(entity_id)
 
     {:noreply, state}
   end
 
   def handle_cast({:begin_attack, entity_id, target_id}, state) do
-    Attacking.add(entity_id: entity_id, target_id: target_id)
+    Attacking.add_component(entity_id: entity_id, target_id: target_id)
 
     {:noreply, state}
   end
 
   def handle_cast({:cancel_attack, entity_id}, state) do
-    Attacking.remove(entity_id)
+    Attacking.remove_component(entity_id)
 
     {:noreply, state}
   end

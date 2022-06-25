@@ -133,7 +133,7 @@ defmodule ElixirQuestWeb.Game do
     %{attacking?: attacking?, pc_id: pc_id} = socket.assigns
 
     PubSub.subscribe(EQPubSub, "entity:#{target_id}")
-    %{current_hp: current_hp, max_hp: max_hp} = Health.get(target_id)
+    %{current_hp: current_hp, max_hp: max_hp} = Health.get_component(target_id)
 
     if attacking?, do: Manager.begin_attack(pc_id, target_id)
 
