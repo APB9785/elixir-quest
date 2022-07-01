@@ -5,14 +5,25 @@ defmodule ElixirQuest.PlayerChars do
   import Ecto.Query
 
   alias ElixirQuest.Accounts.Account
+  alias ElixirQuest.Aspects.Equipment
   alias ElixirQuest.Aspects.Experience
   alias ElixirQuest.Aspects.Health
+  alias ElixirQuest.Aspects.Image
   alias ElixirQuest.Aspects.Level
   alias ElixirQuest.Aspects.Location
+  alias ElixirQuest.Aspects.MovementSpeed
+  alias ElixirQuest.Aspects.Name
+  alias ElixirQuest.Aspects.PlayerChar
+  alias ElixirQuest.Logs
   alias ElixirQuest.Manager
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
   alias ElixirQuest.Repo
+  alias Phoenix.PubSub
+
+  @pc_image_filename "knight.png"
+  @pc_base_movement_speed 250
+  @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000, range: 1.9}
 
   def create_new(attrs) do
     default_attrs = base_attrs()
@@ -79,5 +90,33 @@ defmodule ElixirQuest.PlayerChars do
       x_pos: 6,
       y_pos: 6
     }
+  end
+
+  def spawn(%PC{id: id} = pc) do
+    Location.add_and_broadcast(id, pc.region_id, pc.x_pos, pc.y_pos)
+    Health.add_component(entity_id: id, current_hp: pc.current_hp, max_hp: pc.max_hp)
+    PlayerChar.add_component(entity_id: id)
+    Level.add_component(entity_id: id, level: pc.level)
+    Experience.add_component(entity_id: id, experience: pc.experience)
+    Image.add_component(entity_id: id, image_filename: @pc_image_filename)
+    Name.add_component(entity_id: id, name: pc.name)
+    Equipment.add_component(entity_id: id, equipment_map: %{weapon: @weapon_hands_stats})
+    MovementSpeed.add_component(entity_id: id, movement_speed: @pc_base_movement_speed)
+
+    log_entry = Logs.from_spawn(pc.name)
+    PubSub.broadcast(EQPubSub, "region:#{pc.region_id}", {:log_entry, log_entry})
+  end
+
+  def despawn(%PC{id: id}) do
+    Location.remove_and_broadcast(id)
+
+    Health.remove_component(id)
+    PlayerChar.remove_component(id)
+    Level.remove_component(id)
+    Experience.remove_component(id)
+    Image.remove_component(id)
+    Name.remove_component(id)
+    Equipment.remove_component(id)
+    MovementSpeed.remove_component(id)
   end
 end

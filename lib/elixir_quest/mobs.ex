@@ -52,7 +52,7 @@ defmodule ElixirQuest.Mobs do
   @doc """
   Spawn a mob by inserting all its necessary components.
   """
-  def spawn(%Mob{id: id} = mob) do
+  def spawn_mob(%Mob{id: id} = mob) do
     Location.add_and_broadcast(id, mob.region_id, mob.x_pos, mob.y_pos)
     Health.add_component(entity_id: id, current_hp: mob.max_hp, max_hp: mob.max_hp)
     Wandering.add_component(entity_id: id)
@@ -61,5 +61,9 @@ defmodule ElixirQuest.Mobs do
     Name.add_component(entity_id: id, name: mob.name)
     MovementSpeed.add_component(entity_id: id, movement_speed: @mob_wandering_speed)
     Equipment.add_component(entity_id: id, equipment_map: %{weapon: @goblin_weapon_stats})
+  end
+
+  def spawn_all do
+    Enum.each(load_all(), &spawn_mob/1)
   end
 end

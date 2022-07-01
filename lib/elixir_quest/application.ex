@@ -3,7 +3,6 @@ defmodule ElixirQuest.Application do
   use Application
 
   alias ElixirQuest.Manager
-  alias ElixirQuest.Ticker
 
   @impl true
   def start(_type, _args) do
@@ -12,7 +11,6 @@ defmodule ElixirQuest.Application do
       ElixirQuestWeb.Telemetry,
       {Phoenix.PubSub, name: EQPubSub},
       Manager,
-      Ticker,
       ElixirQuestWeb.Endpoint
     ]
 

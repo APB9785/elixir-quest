@@ -50,4 +50,8 @@ defmodule ElixirQuest.Regions do
     Image.add_component(entity_id: id, image_filename: "rock_mount.png")
     parse_txt(rest, region_id, x + 1, y)
   end
+
+  def load_all_boundaries do
+    Enum.each(load_all(), &load_boundaries/1)
+  end
 end

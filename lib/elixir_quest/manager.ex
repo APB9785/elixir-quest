@@ -7,95 +7,38 @@ defmodule ElixirQuest.Manager do
 
   Updates from the LiveView clients will use a standard GenServer API.
   """
-  use GenServer
+  use ECSx.Manager, tick_rate: 20
 
-  alias ElixirQuest.Aspects.Aggro
   alias ElixirQuest.Aspects.Attacking
-  alias ElixirQuest.Aspects.Cooldown
-  alias ElixirQuest.Aspects.Dead
-  alias ElixirQuest.Aspects.Equipment
-  alias ElixirQuest.Aspects.Experience
-  alias ElixirQuest.Aspects.Health
-  alias ElixirQuest.Aspects.Image
-  alias ElixirQuest.Aspects.Level
   alias ElixirQuest.Aspects.Location
   alias ElixirQuest.Aspects.Moving
-  alias ElixirQuest.Aspects.MovementSpeed
-  alias ElixirQuest.Aspects.Name
   alias ElixirQuest.Aspects.PlayerChar
-  alias ElixirQuest.Aspects.Respawn
-  alias ElixirQuest.Aspects.Seeking
-  alias ElixirQuest.Aspects.Wandering
-  alias ElixirQuest.Logs
   alias ElixirQuest.Mobs
+  alias ElixirQuest.PlayerChars
   alias ElixirQuest.PlayerChars.PlayerChar, as: PC
   alias ElixirQuest.Regions
-  alias Phoenix.PubSub
 
-  @pc_image_filename "knight.png"
-  @pc_base_movement_speed 250
-  @weapon_hands_stats %{name: "hands", damage: 1, cooldown: 1000, range: 1.9}
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, [], name: __MODULE__)
+  setup do
+    Mobs.spawn_all()
+    Regions.load_all_boundaries()
   end
 
-  def init(_) do
-    PubSub.subscribe(EQPubSub, "tick")
-
-    Enum.each(aspects(), fn module -> module.init() end)
-
-    {:ok, [], {:continue, :load}}
-  end
-
-  def handle_continue(:load, state) do
-    mobs = Mobs.load_all()
-    regions = Regions.load_all()
-
-    Enum.each(mobs, &Mobs.spawn/1)
-
-    Enum.each(regions, &Regions.load_boundaries/1)
-
-    {:noreply, state}
-  end
-
-  def handle_call({:spawn_pc, %PC{id: id} = pc}, _from, state) do
+  def handle_call({:spawn_pc, %PC{} = pc}, _from, state) do
     cond do
-      PlayerChar.has_component?(id) ->
+      PlayerChar.has_component?(pc.id) ->
         {:reply, :already_spawned, state}
 
       Location.occupied?(pc.region_id, pc.x_pos, pc.y_pos) ->
         {:reply, :blocked, state}
 
       :otherwise ->
-        Location.add_and_broadcast(id, pc.region_id, pc.x_pos, pc.y_pos)
-        Health.add_component(entity_id: id, current_hp: pc.current_hp, max_hp: pc.max_hp)
-        PlayerChar.add_component(entity_id: id)
-        Level.add_component(entity_id: id, level: pc.level)
-        Experience.add_component(entity_id: id, experience: pc.experience)
-        Image.add_component(entity_id: id, image_filename: @pc_image_filename)
-        Name.add_component(entity_id: id, name: pc.name)
-        Equipment.add_component(entity_id: id, equipment_map: %{weapon: @weapon_hands_stats})
-        MovementSpeed.add_component(entity_id: id, movement_speed: @pc_base_movement_speed)
-
-        log_entry = Logs.from_spawn(pc.name)
-        PubSub.broadcast(EQPubSub, "region:#{pc.region_id}", {:log_entry, log_entry})
-
+        PlayerChars.spawn(pc)
         {:reply, :success, state}
     end
   end
 
-  def handle_call({:despawn_pc, %PC{id: id}}, _from, state) do
-    Location.remove_and_broadcast(id)
-
-    Health.remove_component(id)
-    PlayerChar.remove_component(id)
-    Level.remove_component(id)
-    Experience.remove_component(id)
-    Image.remove_component(id)
-    Name.remove_component(id)
-    Equipment.remove_component(id)
-    MovementSpeed.remove_component(id)
+  def handle_call({:despawn_pc, %PC{} = pc}, _from, state) do
+    PlayerChars.despawn(pc)
 
     {:reply, :success, state}
   end
@@ -124,39 +67,27 @@ defmodule ElixirQuest.Manager do
     {:noreply, state}
   end
 
-  def handle_info({:tick, tick}, state) do
-    # TODO: make this async?
-
-    Enum.each(systems(), fn system ->
-      if rem(tick, system.__period__()) == 0 do
-        system.run()
-      end
-    end)
-
-    {:noreply, state}
-  end
-
-  ## Component / System Modules
+  ## Aspect / System Modules
 
   def aspects do
     [
-      Aggro,
-      Attacking,
-      Cooldown,
-      Dead,
-      Equipment,
-      Experience,
-      Health,
-      Image,
-      Level,
-      Location,
-      MovementSpeed,
-      Moving,
-      Name,
-      PlayerChar,
-      Respawn,
-      Seeking,
-      Wandering
+      ElixirQuest.Aspects.Aggro,
+      ElixirQuest.Aspects.Attacking,
+      ElixirQuest.Aspects.Cooldown,
+      ElixirQuest.Aspects.Dead,
+      ElixirQuest.Aspects.Equipment,
+      ElixirQuest.Aspects.Experience,
+      ElixirQuest.Aspects.Health,
+      ElixirQuest.Aspects.Image,
+      ElixirQuest.Aspects.Level,
+      ElixirQuest.Aspects.Location,
+      ElixirQuest.Aspects.MovementSpeed,
+      ElixirQuest.Aspects.Moving,
+      ElixirQuest.Aspects.Name,
+      ElixirQuest.Aspects.PlayerChar,
+      ElixirQuest.Aspects.Respawn,
+      ElixirQuest.Aspects.Seeking,
+      ElixirQuest.Aspects.Wandering
     ]
   end
 

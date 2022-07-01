@@ -30,9 +30,6 @@ defmodule ElixirQuest.Utils do
     :math.sqrt(x ** 2 + y ** 2)
   end
 
-  def lcm(nums) when is_list(nums), do: Enum.reduce(nums, &lcm/2)
-  def lcm(a, b), do: div(abs(a * b), Integer.gcd(a, b))
-
   def solve_direction({start_x, start_y}, {destination_x, destination_y}) do
     dx = start_x - destination_x
     dy = start_y - destination_y

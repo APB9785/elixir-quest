@@ -16,7 +16,7 @@ defmodule ElixirQuest.Systems.Respawn do
         |> tap(&Respawn.remove_component/1)
         |> tap(&Dead.remove_component/1)
         |> Mobs.get!()
-        |> Mobs.spawn()
+        |> Mobs.spawn_mob()
       end
     end)
   end
